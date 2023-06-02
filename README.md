@@ -16,57 +16,20 @@ When you have set up your repo you may need to change those badges
       - [Install with cookiecutter](#install-with-cookiecutter)
    - [Configuration](#configuration)
 
-# Template repository for MATLAB / Octave projects
+# Inverse streamflow routing
 
-## How to install and use this template
+Inverse streamflow routing (ISR) uses a flow direction map and time series of discharge measurements at points along the river to estimate runoff throughout the river basin.
 
-### Install with Github
+## Contents
 
-1. Click the green button `Use this template`.
+Scripts: Workflows for ISR
+Functions: Main and secondary functions for performing ISR and evaluating the results.
 
-![](https://user-images.githubusercontent.com/6961185/167254070-b6fd34dc-1334-41c5-b0a6-eb7234f008d9.jpg)
+## References
+* Pan, M., & Wood, E. F. (2013). Inverse streamflow routing. Hydrology and Earth System Sciences, 17(11), 4577–4588. https://doi.org/10.5194/hess-17-4577-2013
 
-<hr>
+* Fisher, C. K., Pan, M., & Wood, E. F. (2020). Spatiotemporal assimilation-interpolation of discharge records through inverse streamflow routing. Hydrology and Earth System Sciences, 24(1), 293–305. https://doi.org/10.5194/hess-24-293-2020
 
-2. Give a name to the repository you want to create. Something short that
-   contains the name of your project: `analysis_my_study`.
+* Yang, Y., Lin, P., Fisher, C. K., Turmon, M., Hobbs, J., Emery, C. M., … Pan, M. (2019). Enhancing SWOT discharge assimilation through spatiotemporal correlations. Remote Sensing of Environment, 234(September), 111450. https://doi.org/10.1016/j.rse.2019.111450
 
-![](https://user-images.githubusercontent.com/6961185/167254100-ad4eaa48-36a9-4dee-947e-d6957ab6d8a5.png)
-
-<hr>
-
-3. Decide if you want this new repo to be public or private.
-
-4. Click on `Create repository from template`
-
-   You now have a copy of the template on your Github account. You can then
-   download the code and the pre-set dependencies like this.
-
-5. Click on green `Download` button and copy the `URL_to_your_repo` that is
-   shown there.
-
-6. Open a terminal and type this:
-
-```bash
-git clone URL_to_your_repo
-```
-
-### Install with cookiecutter
-
-Install Cookiecutter:
-
-```bash
-pip install -U cookiecutter
-```
-
-Generate project:
-
-```bash
-cookiecutter https://github.com/Remi-Gau/cookiecutter_matlab_analysis.git
-```
-
-## Configuration
-
-Check the
-[CONTRIBUTING.md](https://github.com/Remi-Gau/template_matlab_analysis/blob/main/CONTRIBUTING.md)
-for more information on setting up this repo.
+Fisher et al., 2021, HESS
