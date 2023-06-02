@@ -16,6 +16,8 @@ When you have set up your repo you may need to change those badges
       - [Install with cookiecutter](#install-with-cookiecutter)
    - [Configuration](#configuration)
 
+This repository was created using the cookiecutter template. There may be some unused files and folders left over from the template.
+
 # Inverse streamflow routing
 
 Inverse streamflow routing (ISR) uses a flow direction map and time series of discharge measurements at points along the river to estimate runoff throughout the river basin.
