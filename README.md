@@ -23,6 +23,7 @@ This repository was created using the cookiecutter template. There may be some u
 Inverse streamflow routing (ISR) uses a flow direction map and time series of discharge measurements at points along the river to estimate runoff throughout the river basin.
 
 Requires GDAL and the R packages gstat and CoSMoS.
+Requires MATLAB mapping toolbox
 
 ## Contents
 

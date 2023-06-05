@@ -1,26 +1,23 @@
 %% Comparing Y20 ISR and ensemble ISR
 %
-% 5/15/2023 JRS
-%
-% This script works/is done
-% It should take about 36 hours to run everything
+% 6/5/2023 JRS
 
-clean
-addpath(genpath('/Users/jschap/Documents/Codes/VICMATLAB/VICMATLAB/vicmatlab'))
-addpath('/Volumes/HD3/ISR/ISR/SimpleExample/Functions')
-addpath('/Volumes/HD3/ISR/ISR/buildup')
+clear, clc, close all
+cd /Volumes/HD3/ISR/inverse_streamflow_routing
+addpath(genpath('./src/'))
 
-cd('/Volumes/HD3/ISR/02_Basins/Ohio/')
+load('./ohio_data/ohio_tmpa_nanfilled.mat')
+load('./ohio_data/ohio_nldas_nanfilled.mat')
+load('./ohio_data/swot_like_measurements_100m_no_error.mat')
 
-load('./ohio_tmpa.mat')
-load('./ohio_nldas.mat')
-load('./basin_setup/swot_like_measurements_100m_no_error.mat')
-% load('./basin_setup/basin.mat')
-
-A = load('./basin_setup/setup-1-gage.mat');
+% add distmat
+A = load('./ohio_data/setup-1-gage.mat');
 basin.distmat = A.basin.distmat;
+
 n = size(HH,2);
 tv = datetime(2009,1,1):datetime(2009,12,31);
+
+% load('./basin_setup/basin.mat')
 
 %% Crop to a shorter domain
 
@@ -50,7 +47,7 @@ colormap cool
 
 %% Assemble runoff prior (Y20)
 
-% basin.mask = flipud(basin.mask);
+basin.mask = flipud(basin.mask);
 figure,plotraster(basin.lonv, basin.latv, basin.mask, 'mask') % should be right side up
 
 basin_mask_linear = basin.mask(:);
@@ -62,54 +59,6 @@ tmpa_runoff_prior(isnan(tmpa_runoff_prior)) = 0;
 nldas_runoff_linear = reshape(nldas.runoff, length(basin_mask_linear), nt);
 nldas_runoff_true = nldas_runoff_linear(logical(basin_mask_linear),:)';
 nldas_runoff_true(isnan(nldas_runoff_true)) = 0;
-
-%% Assemble runoff prior (Ensemble)
-
-% Load in the cosmos errors and use them to corrupt the true runoff
-
-tic
-M = 200; % ensemble size
-A = load('/Volumes/HD3/ISR/02_Basins/Ohio/cosmos_error_gen/m1s1L40T5/errs/simulated_runoff_errors_200_m1s1L40T5.mat');
-
-mean(A.alldata(:))
-std(A.alldata(:))
-
-A.alldata = A.alldata(:,:,1:nt,:);
-
-aa=A.alldata(1,1,:,1);
-figure,plot(aa(:))
-
-figure
-histogram(A.alldata(:))
-xlim([0,6])
-xlabel('Runoff error (mm/day)')
-ylabel('Count')
-
-runoff_errors = reshape(A.alldata, 72*104, nt, M);
-basinmask = basin.mask; % no nan values
-basinmask(isnan(basin.mask)) = 0;
-basinmask = logical(basinmask);
-runoff_errors = runoff_errors(basinmask, :, :);
-
-% Corrupt TMPA runoff with random errors to generate prior
-prior_runoff_ens = zeros(n, nt, M);
-for mm=1:M
-    prior_runoff_ens(:,:,mm) = tmpa_runoff_prior'.*runoff_errors(:,:,mm);
-end
-disp('Generated prior ensemble')
-toc
-
-% Plot prior maps
-
-figure
-t=43:47;
-for i=1:5
-    prior_runoff_map_ENS = make_map(basin, squeeze(mean(prior_runoff_ens(:,t(i),:),3)));
-    subplot(1,5,i)
-    plotraster(basin.lonv, basin.latv, prior_runoff_map_ENS, ['Prior ensemble mean (day ' num2str(t(i)) ')'])
-    caxis([0,6])
-end
-colormap cool
 
 %% Generate discharge "measurements" (Y20)
 
@@ -170,43 +119,6 @@ set(gca, 'fontsize', fs)
 
 % true_discharge_w_swot_sampling
 
-%% Generate discharge "measurements" (Ensemble)
-
-% ENKF() assumes homoscedastic, uncorrelated lognormal errors here
-% we will use unbiased relative error of 15% (COV=0.15, mu = 1)
-mean1 = 1;
-Cv = (0.01)^2; % variance
-mu1 = log((mean1^2)/sqrt(Cv+mean1^2));
-sigma1 = sqrt(log(Cv/(mean1^2)+1));
-% error_corrupted_discharge_meas = true_discharge_w_swot_sampling.*lognrnd(mu1, sigma1, nt, m);
-error_corrupted_discharge_meas = true_discharge.*lognrnd(mu1, sigma1, nt, m);
-
-lrv = lognrnd(mu1, sigma1, 1e4, 1);
-rv = log(lrv);
-
-% figure
-% plot(tv, true_discharge)
-% hold on
-% plot(tv, error_corrupted_discharge_meas)
-% legend('True discharge','Synthetic measurements')
-% xlabel('Time')
-% ylabel('Q (mm/day)')
-
-% Plot error for several gages
-figure
-lw = 2;
-ind = 1;
-for gg=[1,5,10]
-    subplot(1,3,ind)
-    plot(tv, true_discharge(:,gg), 'linewidth', lw)
-    hold on
-    plot(tv, error_corrupted_discharge_meas(:,gg), 'red.', 'markersize', 20)
-    xlabel('Time')
-    legend('Actual discharge','Measured discharge')
-    ylabel('Discharge (mmd/day)')
-    ind = ind + 1;
-end
-
 %% Do ISR (Y20)
 
 % 173 seconds per window to calculate Cx -> about 16 hours for 334 windows
@@ -215,21 +127,17 @@ end
 
 % runoff_init = ones(nt,n);
 
+% s = 2*(k+1);
 s = k+1;
-% s=30;
-optionsfile = './options_ohio.txt';
+optionsfile = './ohio_data/options_ohio.txt';
 rho_thres = exp(-2);
 L = 40; % km
 T = 5; % days
 alpha1 = 1;
 R = (0.15^2);
 
-% takes 1025s
-% [post_runoff_PW13, Klast] = ISR1(tmpa_runoff_prior, HH, gage, s, 'proportional', alpha1, R);
-% COV = 1 and COV = 10 do not produce dramatically different estimates
-
 tic
-[post_runoff_Y20, Klast] = ISR2(tmpa_runoff_prior, HH, gage, s, basin, optionsfile, L, T, rho_thres);
+[post_runoff_Y20, Klast] = ISR_Y20(tmpa_runoff_prior, HH, gage, s, basin, optionsfile, L, T, rho_thres);
 toc
 
 %% Do ISR (Ensemble)
