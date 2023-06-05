@@ -57,3 +57,6 @@ codegen/
 
 # Octave session info
 octave-workspace
+
+# Large files for Ohio basin example
+ohio_data/*
