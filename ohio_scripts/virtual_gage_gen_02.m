@@ -14,13 +14,13 @@
 % Requires GDAL
 
 clear, clc, close all
-cd /home/jschap/Documents/ISR/inverse_streamflow_routing
+cd /Volumes/HD3/ISR/inverse_streamflow_routing
 addpath(genpath('./src/'))
 
 fs = 18;
 lw = 2;
 ms = 20;
-symbspec = makesymbolspec("Line",{'Default','Color','#7E2F8E'});
+symbspec = makesymbolspec('Line',{'Default','Color','#7E2F8E'});
 
 %% Load Ohio basin data
 
@@ -63,7 +63,8 @@ shapewrite(bb, bbfile)
 
 %% Create gauge list and route true runoff to each SWOT overpass location
 
-T3 = readmatrix('../Ohio/overpass_table.txt');
+T3 = dlmread('./ohio_data/overpass_table.txt', '\t', 1, 0);
+% T3 = readmatrix('./ohio_data/overpass_table.txt');
 T3 = table(T3(:,1), T3(:,2), T3(:,3));
 T3.Properties.VariableNames{1} = 'lon';
 T3.Properties.VariableNames{2} = 'lat';
@@ -155,6 +156,7 @@ for i=1:m
     
 end
 
+find(orbit_days==0)
 % gages have between 0-4 observations per cycle
 
 %% Get discharge for this time for locations matching the orbit day
@@ -183,6 +185,12 @@ for t=1:nt
         
 end
 
+% Remove gauges with no observations:
+i_remove = find(num_overpasses==0);
+true_discharge(:,i_remove) = [];
+true_discharge_w_swot_sampling(:,i_remove) = [];
+orbit_days(i_remove) = [];
+
 %% Check virtual measurements
 
 figure,imagescnan(true_discharge_w_swot_sampling)
@@ -209,3 +217,36 @@ overpass_table = T3;
 save('./ohio_data/swot_like_measurements_100m_no_error_revised.mat', 'true_discharge',...
     'true_discharge_w_swot_sampling','overpass_table','basin','HH','k','orbit_cycle',...
     'flow_vel','travel_time')
+
+%% Make map of virtual gage locations for paper
+
+m = length(orbit_days);
+for mm=1:m
+    num_overpasses(mm) = length(orbit_days{mm});
+end
+
+grwl = shaperead('./ohio_data/grwl_ohio.shp');
+swot = shaperead('./ohio_data/swot_ohio.shp');
+
+figure
+plotraster(basin.lonv, basin.latv, flipud(basin.mask), 'Virtual Gages (>100m)')
+colorbar off
+hold on
+for i=1:length(grwl)
+    plot(grwl(i).X, grwl(i).Y, 'k') % grwl centerlines
+end
+% for i=1:length(swot)
+%     plot(swot(i).X, swot(i).Y, 'blue') % swot overpasses
+% end
+numGroups = length(unique(num_overpasses));
+clr = [254,240,217;
+253, 204, 13;
+227, 74, 51; 
+179, 0, 0]/255;
+siz = [1,1,1,1,1]*30;
+h = gscatter(basin.gage_lon, basin.gage_lat, num_overpasses', clr, '.', siz, 'off'); % color code by nobs/cycle
+legend(h, 'n_{obs} = 1', 'n_{obs} = 2', 'n_{obs} = 3', 'n_{obs} = 4')
+axis('equal')
+
+
+
