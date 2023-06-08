@@ -8,7 +8,7 @@ addpath(genpath('./src/'))
 
 load('./ohio_data/ohio_tmpa_nanfilled.mat')
 load('./ohio_data/ohio_nldas_nanfilled.mat')
-load('./ohio_data/swot_like_measurements_100m_no_error.mat')
+load('./ohio_data/swot_like_measurements_100m_no_error_revised.mat')
 
 % add distmat
 A = load('./ohio_data/setup-1-gage.mat');
@@ -34,7 +34,7 @@ tv = datetime(2009,1,1):datetime(2009,12,31);
 % TMPA prior, NLDAS truth
 
 figure
-t=43:47;
+t=73:77;
 for i=1:5
     subplot(2,5,i)
     plotraster(basin.lonv, basin.latv, tmpa.runoff(:,:,t(i)), ['TMPA runoff (day ' num2str(t(i)) ')'])
@@ -124,11 +124,12 @@ set(gca, 'fontsize', fs)
 
 % runoff_init = ones(nt,n);
 
-s = 2*(k+1);
+% s = k+1;
+s = 2*(k+1)-1; % for window of length 32 days
 alpha1 = 1;
-R = (0.15^2);
+R = (0.15^2); % meas error covariance
 
-% takes about 8 minutes with these parameters on my PC
+% takes about 1.5 hr with these parameters on my PC
 tic
 [post_runoff_PW13, Klast] = ISR_PW13(tmpa_runoff_prior, HH, gage, s, 'proportional', alpha1, R);
 toc

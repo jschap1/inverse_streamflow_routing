@@ -143,7 +143,8 @@ while i2<=nt % until out of range
     % Construct measurement error matrix (relative error)
     R = eye(m*(s+1));
     R(1:(m*(s+1)+1):end) = y.^2;
-    R = (meas_err)^2*R;
+    R = (meas_err)*R;
+    R = sparse(R);
     
     K = kalman_gain_pw13(H, P, R, missing_rows, w);
     x_update = x + K*innovation;

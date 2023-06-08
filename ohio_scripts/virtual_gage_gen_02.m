@@ -156,7 +156,6 @@ for i=1:m
     
 end
 
-find(orbit_days==0)
 % gages have between 0-4 observations per cycle
 
 %% Get discharge for this time for locations matching the orbit day
@@ -185,11 +184,17 @@ for t=1:nt
         
 end
 
+m = length(orbit_days);
+for mm=1:m
+    num_overpasses(mm) = length(orbit_days{mm});
+end
+
 % Remove gauges with no observations:
 i_remove = find(num_overpasses==0);
 true_discharge(:,i_remove) = [];
 true_discharge_w_swot_sampling(:,i_remove) = [];
 orbit_days(i_remove) = [];
+HH(i_remove,:,:) = [];
 
 %% Check virtual measurements
 
@@ -219,11 +224,6 @@ save('./ohio_data/swot_like_measurements_100m_no_error_revised.mat', 'true_disch
     'flow_vel','travel_time')
 
 %% Make map of virtual gage locations for paper
-
-m = length(orbit_days);
-for mm=1:m
-    num_overpasses(mm) = length(orbit_days{mm});
-end
 
 grwl = shaperead('./ohio_data/grwl_ohio.shp');
 swot = shaperead('./ohio_data/swot_ohio.shp');
