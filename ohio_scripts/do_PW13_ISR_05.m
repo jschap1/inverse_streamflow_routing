@@ -134,6 +134,8 @@ tic
 [post_runoff_PW13, Klast] = ISR_PW13(tmpa_runoff_prior, HH, gage, s, 'proportional', alpha1, R);
 toc
 
+save('./ohio_data/ISR_results_PW13_m240.mat', 'post_runoff_PW13', 's', 'alpha1', 'R', 'gage')
+
 %% Plot overview of results
 
 truth = struct();

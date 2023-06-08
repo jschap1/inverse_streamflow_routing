@@ -195,6 +195,16 @@ true_discharge(:,i_remove) = [];
 true_discharge_w_swot_sampling(:,i_remove) = [];
 orbit_days(i_remove) = [];
 HH(i_remove,:,:) = [];
+travel_time(i_remove) = [];
+basin.gage_area(i_remove) = [];
+basin.gage_lon(i_remove) = [];
+basin.gage_lat(i_remove) = [];
+basin.gage_i(i_remove) = [];
+basin.gage_j(i_remove) = [];
+basin.gage_accum(i_remove) = [];
+basin.mask_gage(:,:,i_remove) = [];
+basin.flow_length_gage(:,:,i_remove) = [];
+num_overpasses(i_remove) = [];
 
 %% Check virtual measurements
 
@@ -221,7 +231,7 @@ overpass_table = T3;
 
 save('./ohio_data/swot_like_measurements_100m_no_error_revised.mat', 'true_discharge',...
     'true_discharge_w_swot_sampling','overpass_table','basin','HH','k','orbit_cycle',...
-    'flow_vel','travel_time')
+    'flow_vel','travel_time', 'num_overpasses', 'i_remove')
 
 %% Make map of virtual gage locations for paper
 

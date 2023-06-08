@@ -1,24 +1,19 @@
-%% Comparing Y20 ISR and ensemble ISR
+%% Domain ISR with log transform and ensemble Kalman update
 %
-% 5/15/2023 JRS
-%
-% This script works/is done
-% It should take about 36 hours to run everything
+% 6/7/2023 JRS
 
-clean
-addpath(genpath('/Users/jschap/Documents/Codes/VICMATLAB/VICMATLAB/vicmatlab'))
-addpath('/Volumes/HD3/ISR/ISR/SimpleExample/Functions')
-addpath('/Volumes/HD3/ISR/ISR/buildup')
+clear, clc, close all
+cd /Volumes/HD3/ISR/inverse_streamflow_routing
+addpath(genpath('./src/'))
 
-cd('/Volumes/HD3/ISR/02_Basins/Ohio/')
+load('./ohio_data/ohio_tmpa_nanfilled.mat')
+load('./ohio_data/ohio_nldas_nanfilled.mat')
+load('./ohio_data/swot_like_measurements_100m_no_error_revised.mat')
 
-load('./ohio_tmpa.mat')
-load('./ohio_nldas.mat')
-load('./basin_setup/swot_like_measurements_100m_no_error.mat')
-% load('./basin_setup/basin.mat')
-
-A = load('./basin_setup/setup-1-gage.mat');
+% add distmat
+A = load('./ohio_data/setup-1-gage.mat');
 basin.distmat = A.basin.distmat;
+
 n = size(HH,2);
 tv = datetime(2009,1,1):datetime(2009,12,31);
 
@@ -37,7 +32,7 @@ tv = datetime(2009,1,1):datetime(2009,12,31);
 % TMPA prior, NLDAS truth
 
 figure
-t=43:47;
+t=73:77;
 for i=1:5
     subplot(2,5,i)
     plotraster(basin.lonv, basin.latv, tmpa.runoff(:,:,t(i)), ['TMPA runoff (day ' num2str(t(i)) ')'])
@@ -50,7 +45,7 @@ colormap cool
 
 %% Assemble runoff prior (Y20)
 
-% basin.mask = flipud(basin.mask);
+basin.mask = flipud(basin.mask);
 figure,plotraster(basin.lonv, basin.latv, basin.mask, 'mask') % should be right side up
 
 basin_mask_linear = basin.mask(:);
@@ -69,7 +64,7 @@ nldas_runoff_true(isnan(nldas_runoff_true)) = 0;
 
 tic
 M = 200; % ensemble size
-A = load('/Volumes/HD3/ISR/02_Basins/Ohio/cosmos_error_gen/m1s1L40T5/errs/simulated_runoff_errors_200_m1s1L40T5.mat');
+A = load('./ohio_data/cosmos_error_gen/m1s1L40T5/errs/simulated_runoff_errors_200_m1s1L40T5.mat');
 
 mean(A.alldata(:))
 std(A.alldata(:))
@@ -102,7 +97,7 @@ toc
 % Plot prior maps
 
 figure
-t=43:47;
+t=73:77;
 for i=1:5
     prior_runoff_map_ENS = make_map(basin, squeeze(mean(prior_runoff_ens(:,t(i),:),3)));
     subplot(1,5,i)
@@ -111,71 +106,12 @@ for i=1:5
 end
 colormap cool
 
-%% Generate discharge "measurements" (Y20)
-
-gage = true_discharge; % should corrupt with error
-% gage = true_discharge_w_swot_sampling; % should corrupt with error
-
-% Y20: additive Gaussian error with mu, sigma
-
-mu1 = 0; % mean of additive error
-% sigma1 = 0.3*gage; % stddev of additive error (30% of truth)
-for tt=1:nt
-    for mm=1:m
-        sigma1 = 0.15*gage(tt,mm);
-        add_err(tt,mm) = mu1 + sigma1*randn(1,1);
-    end
-    disp(tt)
-end
-gage_w_error = gage + add_err;
-% add_err = mu1 + sigma1.*randn(nt,m);
-
-% Plot error for several gages
-figure
-lw = 2;
-ind = 1;
-for gg=[1,5,10]
-    subplot(1,3,ind)
-    plot(tv, gage(:,gg), 'linewidth', lw)
-    hold on
-    plot(tv, gage_w_error(:,gg), 'red.', 'markersize', 20)
-    xlabel('Time')
-    legend('Actual discharge','Measured discharge')
-    ylabel('Discharge (mmd/day)')
-    ind = ind + 1;
-end
-% ensemble ISR: multiplicative LN error with mean, stddev
-
-err = true_discharge(:) - gage_w_error(:);
-mean(err)
-std(err)
-
-figure
-histogram(err)
-
-%% Plot discharge "measurements" (Y20)
-
-ms = 30;
-fs = 16;
-figure
-plot(tv, true_discharge(:,1), 'linewidth', lw)
-hold on 
-plot(tv, gage_w_error(:,1), '.', 'markersize', ms)
-legend('Truth','Measurements')
-xlabel('time')
-ylabel('Q (mm/day)')
-grid on
-title('Discharge at outlet')
-set(gca, 'fontsize', fs)
-
-% true_discharge_w_swot_sampling
-
 %% Generate discharge "measurements" (Ensemble)
 
 % ENKF() assumes homoscedastic, uncorrelated lognormal errors here
 % we will use unbiased relative error of 15% (COV=0.15, mu = 1)
 mean1 = 1;
-Cv = (0.01)^2; % variance
+Cv = (0.15)^2; % variance
 mu1 = log((mean1^2)/sqrt(Cv+mean1^2));
 sigma1 = sqrt(log(Cv/(mean1^2)+1));
 % error_corrupted_discharge_meas = true_discharge_w_swot_sampling.*lognrnd(mu1, sigma1, nt, m);
@@ -207,36 +143,11 @@ for gg=[1,5,10]
     ind = ind + 1;
 end
 
-%% Do ISR (Y20)
-
-% 173 seconds per window to calculate Cx -> about 16 hours for 334 windows
-% Approx. 180 seconds per window to calculate K using pinv or \ (use pinv)
-% It ends up taking about 6 minutes per window to run Y20 ISR for Ohio
-
-% runoff_init = ones(nt,n);
-
-s = k+1;
-% s=30;
-optionsfile = './options_ohio.txt';
-rho_thres = exp(-2);
-L = 40; % km
-T = 5; % days
-alpha1 = 1;
-R = (0.15^2);
-
-% takes 1025s
-% [post_runoff_PW13, Klast] = ISR1(tmpa_runoff_prior, HH, gage, s, 'proportional', alpha1, R);
-% COV = 1 and COV = 10 do not produce dramatically different estimates
-
-tic
-[post_runoff_Y20, Klast] = ISR2(tmpa_runoff_prior, HH, gage, s, basin, optionsfile, L, T, rho_thres);
-toc
-
 %% Do ISR (Ensemble)
 
 % For some reason I need to load this instance of "basin"...
 % Probably due to flipud tbh
-C = load('./basin_setup/swot_like_measurements_100m_no_error.mat');
+C = load('./ohio_data/swot_like_measurements_100m_no_error_revised.mat');
 
 % Trim down to size for test purposes
 % tmax = 50;
@@ -250,17 +161,19 @@ C = load('./basin_setup/swot_like_measurements_100m_no_error.mat');
 % NaN/Inf?
 opt = struct();
 runoff_prior = ones(n, nt, M);
-Cv = (0.01)^2;
+Cv = (0.15)^2;
 s = k+1;
 C.basin.flow_vel = flow_vel;
 C.basin.timestep = 3600*24;
 tic
-[post_runoff, w1, w2, maxv, maxv_sub] = ISR_EnKF_domain_wrapper_d2(prior_runoff_ens, ...
+% Most likely will take about 8 hours
+[post_runoff, w1, w2, maxv, maxv_sub] = ISR_domain_wrapper(prior_runoff_ens, ...
     HH, error_corrupted_discharge_meas, s, C.basin, Cv, opt, tv);
 toc
 
 % Save results
-save('./ohio_basin_ensemble_ISR_results_M200_Cv0.01.mat', 'post_runoff', '-v7.3')
+save('./ohio_data/ISR_results_domain_m240.mat', 'post_runoff', ...
+    'error_corrupted_discharge_meas','s','Cv','opt','tv','-v7.3')
 
 % post_runoff_orig = post_runoff;
 % post_runoff(post_runoff>1e5) = 0;
