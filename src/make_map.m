@@ -8,8 +8,8 @@ function [M, lons, lats] = make_map(basin, var)
 
 [nrows, ncols] = size(basin.mask);
 
-bmask = (basin.mask);
-% bmask = flipud(basin.mask);
+% bmask = (basin.mask);
+bmask = flipud(basin.mask);
 
 if sum(isnan(bmask(:))) == 0
     bmask = double(bmask);

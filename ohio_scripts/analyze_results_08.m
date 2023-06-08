@@ -36,7 +36,20 @@ PW13.predQ = state_model_dumb(PW13.post_runoff_PW13, HH);
 Y20.predQ = state_model_dumb(Y20.post_runoff_Y20, HH);
 % ENS.predQ = state_model_dumb(ENS.post_runoff, HH);
 
-%% 
+%% Assemble true and prior mean runoff matrices
+
+basin.mask = flipud(basin.mask);
+figure,plotraster(basin.lonv, basin.latv, basin.mask, 'mask') % should be right side up
+
+basin_mask_linear = basin.mask(:);
+basin_mask_linear(isnan(basin_mask_linear)) = 0;
+tmpa_runoff_linear = reshape(tmpa.runoff, length(basin_mask_linear), nt);
+tmpa_runoff_prior = tmpa_runoff_linear(logical(basin_mask_linear),:)';
+tmpa_runoff_prior(isnan(tmpa_runoff_prior)) = 0;
+
+nldas_runoff_linear = reshape(nldas.runoff, length(basin_mask_linear), nt);
+nldas_runoff_true = nldas_runoff_linear(logical(basin_mask_linear),:)';
+nldas_runoff_true(isnan(nldas_runoff_true)) = 0;
 
 %% Compare prior, posterior, truth (basin mean)
 
@@ -51,21 +64,104 @@ lw = 2;
 fs = 16;
 
 figure
-plot(tv, mean_prior_runoff, 'linewidth', lw, 'color', 'green')
+h1 = plot(tv, mean_prior_runoff, 'linewidth', lw, 'color', 'green');
 hold on
-plot(tv, Y20.mean_post_runoff, 'linewidth', lw, 'color', 'blue')
-plot(tv, mean(ENS.mean_posterior_runoff,1), 'r--', 'linewidth', lw)
-plot(tv, mean_true_runoff, 'linewidth', lw, 'color', 'k')
-legend('Prior','Posterior (Y20)','Posterior (Ensemble ISR)', 'True')
+h2 = plot(tv, mean(PW13.post_runoff_PW13,2), 'linewidth', lw, 'color', 'blue');
+h3 = plot(tv, mean(Y20.post_runoff_Y20,2), 'linewidth', lw, 'color', 'cyan');
+h4 = plot(tv, mean(Y20.post_runoff_Y20,2), 'r--', 'linewidth', lw);
+h5 = plot(tv, mean_true_runoff, 'linewidth', lw, 'color', 'k');
 set(gca, 'fontsize', fs)
 
+% add vertical lines at key times
+t = [42, 73, 81, 336];
+ymax = 14;
+plot([tv(t(1)) tv(t(1))],[0 ymax], 'k-')
+plot([tv(t(2)) tv(t(2))],[0 ymax], 'k-')
+plot([tv(t(3)) tv(t(3))],[0 ymax], 'k-')
+plot([tv(t(4)) tv(t(4))],[0 ymax], 'k-')
+
+legend([h1, h2, h3, h4, h5], 'Prior','Posterior (PW13)', 'Posterior (Y20)','Posterior (Ensemble ISR)', 'True')
+
 prior_nse = myNSE(mean_true_runoff, mean_prior_runoff);
-post_nse = myNSE(mean_true_runoff, mean_post_runoff');
+PW13.post_nse = myNSE(mean_true_runoff, mean(PW13.post_runoff_PW13,2));
+Y20.post_nse = myNSE(mean_true_runoff, mean(Y20.post_runoff_Y20,2));
+% ENS.post_nse = myNSE(mean_true_runoff, mean(ENS.post_runoff,2));
 
 prior_bias = mean(mean_prior_runoff)/mean(mean_true_runoff);
-post_bias = mean(mean_post_runoff)/mean(mean_true_runoff);
+PW13.post_bias = mean(mean(PW13.post_runoff_PW13,2))/mean(mean_true_runoff);
+Y20.post_bias = mean(mean(Y20.post_runoff_Y20,2))/mean(mean_true_runoff);
 
-%% Posterior runoff timeseries figure (PW13/Y20 method)
+%% Compare prior, posterior, and true runoff (maps)
+
+figure
+% t=30:34;
+% t=[73, 74, 75, 76];
+t=[42, 73, 81, 336];
+
+cmax = 6;
+
+for i=1:4
+
+%     prior_runoff_map = make_map(basin, tmpa_runoff_prior(t(i), :));
+     post_runoff_map_PW13 = make_map(basin, PW13.post_runoff_PW13(t(i),:));
+     post_runoff_map_Y20 = make_map(basin, Y20.post_runoff_Y20(t(i),:));
+%     post_runoff_map_ENS = make_map(basin, ENS.mean_posterior_runoff(:,t(i)));
+    
+    % Prior
+    subplot(5,4,i)
+    plotraster(basin.lonv, basin.latv, tmpa.runoff(:,:,t(i)), ['TMPA Prior (day ' num2str(t(i)) ')'])
+%     plotraster(basin.lonv, basin.latv, prior_runoff_map, ['Prior (day ' num2str(t(i)) ')'])
+%     caxis([0,cmax])
+    
+    % Posterior (PW13)
+    subplot(5,4,4+i)
+    plotraster(basin.lonv, basin.latv, post_runoff_map_PW13, ['PW13 Posterior (day ' num2str(t(i)) ')'])
+%     caxis([0,cmax])
+    
+    % Posterior (Y20)
+    subplot(5,4,8+i)
+    plotraster(basin.lonv, basin.latv, post_runoff_map_Y20, ['Y20 Posterior (day ' num2str(t(i)) ')'])
+%     caxis([0,cmax])
+    
+    % Posterior (Ensemble)
+    subplot(5,4,12+i)
+    plotraster(basin.lonv, basin.latv, post_runoff_map_Y20, ['Y20 Posterior (day ' num2str(t(i)) ')'])
+%     caxis([0,cmax])
+    
+    % Truth
+    subplot(5,4,16+i)
+    plotraster(basin.lonv, basin.latv, nldas.runoff(:,:,t(i)), ['NLDAS Truth (day ' num2str(t(i)) ')'])
+%     caxis([0,cmax])
+    
+end
+colormap cool
+
+%% Plot map of how many downstream gauges each cell has?
+
+basin.ds_gages = flipud(sum(basin.mask_gage,3));
+
+figure
+plotraster(basin.lonv, basin.latv, basin.ds_gages, 'ds gages')
+
+%% Plot map of how many other cells this cell has to share a gage with?
+
+%% Plot map of sub-basins?
+
+% smaller subbasins should have better results
+% number the sub-basins, use colorpicker for this
+
+% Might be better done in a mapping program
+% Need a raster with different numbers for each subbasin
+
+figure,imagesc(basin.mask_gage(:,:,1))
+
+% trying to figure out how to choose interesting grid cells to plot/explain
+% what we see in the results
+
+
+%% Plot runoff timeseries for selected grid cells
+
+gc = []; % grid cells to plot
 
 figure
 
@@ -113,84 +209,42 @@ legend([h1,h2,h3], {'Truth','Prior Mean','Posterior Mean'})
 set(gca, 'fontsize', fs)
 ylim([-2,14])
 
-%% Compare prior, posterior, and truth (maps)
-
-% Something may be wrong with the posterior_runoff_maps...
-
-% TMPA prior, NLDAS truth
-
-% These should be the same
-
-% figure
-% subplot(1,2,1)
-% plotraster(basin.lonv, basin.latv, tmpa.runoff(:,:,t(i)), 'TMPA 1')
-% subplot(1,2,2)
-% plotraster(basin.lonv, basin.latv, make_map(basin, tmpa_runoff_prior(t(i), :)), 'TMPA 1')
-
-% post_runoff_w_neg = post_runoff_PW13;
-% post_runoff_PW13(post_runoff_PW13<0) = 0;
-
-% post_runoff_Y20_w_neg = post_runoff_Y20;
-% post_runoff_Y20(post_runoff_Y20<0) = 0;
-
-figure
-% t=30:34;
-t=[42, 75, 81, 336];
-
-cmax = 6;
-
-for i=1:4
-
-%     prior_runoff_map = make_map(basin, tmpa_runoff_prior(t(i), :));
-%     post_runoff_map = make_map(basin, post_runoff_Y20(t(i),:));
-    post_runoff_map_ENS = make_map(basin, ENS.mean_posterior_runoff(:,t(i)));
-    
-    % Prior
-    subplot(4,4,i)
-    plotraster(basin.lonv, basin.latv, tmpa.runoff(:,:,t(i)), ['Prior (day ' num2str(t(i)) ')'])
-%     plotraster(basin.lonv, basin.latv, prior_runoff_map, ['Prior (day ' num2str(t(i)) ')'])
-    caxis([0,cmax])
-
-    % Posterior (Y20)
-%     subplot(4,4,4+i)
-%     plotraster(basin.lonv, basin.latv, post_runoff_map, ['Posterior (day ' num2str(t(i)) ')'])
-%     caxis([0,cmax])
-    
-    % Posterior (Ensemble)
-    subplot(4,4,8+i)
-    plotraster(basin.lonv, basin.latv, post_runoff_map_ENS, ['Posterior (day ' num2str(t(i)) ')'])
-    caxis([0,cmax])
-    
-    % Truth
-    subplot(4,4,12+i)
-    plotraster(basin.lonv, basin.latv, nldas.runoff(:,:,t(i)), ['Truth (day ' num2str(t(i)) ')'])
-    caxis([0,cmax])
-    
-end
-colormap cool
-
 %% Plot maps, calculate GoF
 
 % gi = 1:365;
 gi = (k+2):nt-(k+1);
 % gi = 33:40;
 
+basin_in = basin;
+basin_in.mask = flipud(basin_in.mask);
+
+nse_min = -2;
+ms = 10;
 figure
-[nse, kge, rmse, nsemap] = plot_gofmaps(basin, tmpa_runoff_prior, nldas_runoff_true', gi);
-title('Prior NSE')
+subplot(1,4,1)
+[nse, kge, rmse, nsemap] = plot_gofmaps(basin_in, tmpa_runoff_prior, nldas_runoff_true', gi);
+hold on 
+plot(basin.gage_lon, basin.gage_lat, 'r.', 'markersize', ms)
+title('TMPA Prior NSE')
+caxis([nse_min,1])
 
-figure
-[nse, kge, rmse, nsemap] = plot_gofmaps(basin, post_runoff_PW13, nldas_runoff_true', gi);
-title('Posterior NSE')
+subplot(1,4,2)
+[nse, kge, rmse, nsemap] = plot_gofmaps(basin_in, PW13.post_runoff_PW13, nldas_runoff_true', gi);
+hold on 
+plot(basin.gage_lon, basin.gage_lat, 'r.', 'markersize', ms)
+title('PW13 Posterior NSE')
+caxis([nse_min,1])
 
-%% Checking Kalman update for perfectly correlated case
+subplot(1,4,3)
+[nse, kge, rmse, nsemap] = plot_gofmaps(basin_in, Y20.post_runoff_Y20, nldas_runoff_true', gi);
+hold on 
+plot(basin.gage_lon, basin.gage_lat, 'r.', 'markersize', ms)
+title('Y20 Posterior NSE')
+caxis([nse_min,1])
 
-sigma = 0.83; % for s = 2 case
-C = ones(12,12);
-H = [0,0,1,0,1,1,0,1,0,0,0,0;
-    0,0,0,0,0,0,1,0,1,1,0,1;
-    0,0,0,0,0,0,0,0,0,0,1,0];
-Cxy = sigma^2*C*H';
-Cyy = sigma^2*H*C*H';
-Cv = 0.15^2*eye(3);
-K = Cxy*inv(Cyy+Cv);
+% subplot(1,4,4)
+% [nse, kge, rmse, nsemap] = plot_gofmaps(basin_in, ENS.post_runoff_PW13, nldas_runoff_true', gi);
+% title('ENS Posterior NSE')
+% caxis([nse_min,1])
+
+
