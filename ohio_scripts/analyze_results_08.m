@@ -4,6 +4,7 @@
 
 clear, clc, close all
 cd /Volumes/HD3/ISR/inverse_streamflow_routing
+addpath(genpath('/Users/jschap/Documents/MATLAB/')) % optional cbrewer/colorspace (FEX)
 addpath(genpath('./src/'))
 
 load('./ohio_data/ohio_tmpa_nanfilled.mat')
@@ -28,13 +29,14 @@ PW13 = load('./ohio_data/ISR_results_PW13_m240.mat');
 Y20 = load('./ohio_data/ISR_results_Y20_m240.mat');
 
 % load ensemble domain ISR results
-% ENS = load('./ohio_data/domain_ISR_results_M5.mat');
+ENS = load('./ohio_data/ISR_results_domain_m240.mat');
+ENS.mean_post_runoff = mean(ENS.post_runoff,3)';
 
 %% Calculate discharge at each gage
 
 PW13.predQ = state_model_dumb(PW13.post_runoff_PW13, HH);
 Y20.predQ = state_model_dumb(Y20.post_runoff_Y20, HH);
-% ENS.predQ = state_model_dumb(ENS.post_runoff, HH);
+ENS.predQ = state_model_dumb(ENS.mean_post_runoff, HH);
 
 %% Assemble true and prior mean runoff matrices
 
@@ -68,7 +70,7 @@ h1 = plot(tv, mean_prior_runoff, 'linewidth', lw, 'color', 'green');
 hold on
 h2 = plot(tv, mean(PW13.post_runoff_PW13,2), 'linewidth', lw, 'color', 'blue');
 h3 = plot(tv, mean(Y20.post_runoff_Y20,2), 'linewidth', lw, 'color', 'cyan');
-h4 = plot(tv, mean(Y20.post_runoff_Y20,2), 'r--', 'linewidth', lw);
+h4 = plot(tv, mean(ENS.mean_post_runoff,2), 'r--', 'linewidth', lw);
 h5 = plot(tv, mean_true_runoff, 'linewidth', lw, 'color', 'k');
 set(gca, 'fontsize', fs)
 
@@ -93,48 +95,20 @@ Y20.post_bias = mean(mean(Y20.post_runoff_Y20,2))/mean(mean_true_runoff);
 
 %% Compare prior, posterior, and true runoff (maps)
 
-figure
-% t=30:34;
-% t=[73, 74, 75, 76];
-t=[42, 73, 81, 336];
+% Where do neg val occur?
+PW13.minval = min(PW13.post_runoff_PW13, [], 2);
+Y20.minval = min(Y20.post_runoff_Y20, [], 2);
 
-cmax = 6;
+t=[42, 73, 88, 336];
+cbnds = [-1,20;-1,6;-1,6;-1,10];
 
-for i=1:4
+plot_runoff_map_snapshots(t, cbnds, basin, PW13.post_runoff_PW13, ...
+    Y20.post_runoff_Y20, ENS.mean_post_runoff, tmpa, nldas);
 
-%     prior_runoff_map = make_map(basin, tmpa_runoff_prior(t(i), :));
-     post_runoff_map_PW13 = make_map(basin, PW13.post_runoff_PW13(t(i),:));
-     post_runoff_map_Y20 = make_map(basin, Y20.post_runoff_Y20(t(i),:));
-%     post_runoff_map_ENS = make_map(basin, ENS.mean_posterior_runoff(:,t(i)));
-    
-    % Prior
-    subplot(5,4,i)
-    plotraster(basin.lonv, basin.latv, tmpa.runoff(:,:,t(i)), ['TMPA Prior (day ' num2str(t(i)) ')'])
-%     plotraster(basin.lonv, basin.latv, prior_runoff_map, ['Prior (day ' num2str(t(i)) ')'])
-%     caxis([0,cmax])
-    
-    % Posterior (PW13)
-    subplot(5,4,4+i)
-    plotraster(basin.lonv, basin.latv, post_runoff_map_PW13, ['PW13 Posterior (day ' num2str(t(i)) ')'])
-%     caxis([0,cmax])
-    
-    % Posterior (Y20)
-    subplot(5,4,8+i)
-    plotraster(basin.lonv, basin.latv, post_runoff_map_Y20, ['Y20 Posterior (day ' num2str(t(i)) ')'])
-%     caxis([0,cmax])
-    
-    % Posterior (Ensemble)
-    subplot(5,4,12+i)
-    plotraster(basin.lonv, basin.latv, post_runoff_map_Y20, ['Y20 Posterior (day ' num2str(t(i)) ')'])
-%     caxis([0,cmax])
-    
-    % Truth
-    subplot(5,4,16+i)
-    plotraster(basin.lonv, basin.latv, nldas.runoff(:,:,t(i)), ['NLDAS Truth (day ' num2str(t(i)) ')'])
-%     caxis([0,cmax])
-    
-end
-colormap cool
+% adjusting colorbar to highlight negative values
+nn = 21; % must be odd
+cmap = cbrewer2('seq','YlGnBu',nn); % blues at bottom
+colormap([1,0,0;cmap]); % black for negative values
 
 %% Plot map of how many downstream gauges each cell has?
 
@@ -218,7 +192,7 @@ gi = (k+2):nt-(k+1);
 basin_in = basin;
 basin_in.mask = flipud(basin_in.mask);
 
-nse_min = -2;
+nse_min = 0;
 ms = 10;
 figure
 subplot(1,4,1)
@@ -242,9 +216,11 @@ plot(basin.gage_lon, basin.gage_lat, 'r.', 'markersize', ms)
 title('Y20 Posterior NSE')
 caxis([nse_min,1])
 
-% subplot(1,4,4)
-% [nse, kge, rmse, nsemap] = plot_gofmaps(basin_in, ENS.post_runoff_PW13, nldas_runoff_true', gi);
-% title('ENS Posterior NSE')
-% caxis([nse_min,1])
+subplot(1,4,4)
+[nse, kge, rmse, nsemap] = plot_gofmaps(basin_in, ENS.mean_post_runoff, nldas_runoff_true', gi);
+title('ENS Posterior NSE')
+hold on 
+plot(basin.gage_lon, basin.gage_lat, 'r.', 'markersize', ms)
+caxis([nse_min,1])
 
 
