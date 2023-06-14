@@ -21,12 +21,12 @@ tv = datetime(2009,1,1):datetime(2009,12,31);
 
 %% Crop to a shorter domain
 
-tmax = 50;
-tv = tv(1:tmax);
-true_discharge = true_discharge(1:tmax,:);
-true_discharge_w_swot_sampling = true_discharge_w_swot_sampling(1:tmax,:);
-tmpa.runoff = tmpa.runoff(:,:,1:tmax);
-nldas.runoff = nldas.runoff(:,:,1:tmax);
+% tmax = 50;
+% tv = tv(1:tmax);
+% true_discharge = true_discharge(1:tmax,:);
+% true_discharge_w_swot_sampling = true_discharge_w_swot_sampling(1:tmax,:);
+% tmpa.runoff = tmpa.runoff(:,:,1:tmax);
+% nldas.runoff = nldas.runoff(:,:,1:tmax);
 
 [nt,m] = size(true_discharge);
 

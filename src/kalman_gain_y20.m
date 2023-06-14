@@ -12,12 +12,12 @@
 function K = kalman_gain_y20(H, P, R, missing_rows, w)
 
 % Cut to size for debugging
-m = 240;
-n = 3681;
-H = H(1:m,1:n);
-P = P(1:n,1:n);
-R = R(1:m,1:m);
-missing_rows = missing_rows(1:m);
+% m = 240;
+% n = 3681;
+% H = H(1:m,1:n);
+% P = P(1:n,1:n);
+% R = R(1:m,1:m);
+% missing_rows = missing_rows(1:m);
 
 disp(['Calculating Kalman gain for window ' num2str(w)])
 
