@@ -11,6 +11,14 @@
 
 function K = kalman_gain_y20(H, P, R, missing_rows, w)
 
+% Cut to size for debugging
+m = 240;
+n = 3681;
+H = H(1:m,1:n);
+P = P(1:n,1:n);
+R = R(1:m,1:m);
+missing_rows = missing_rows(1:m);
+
 disp(['Calculating Kalman gain for window ' num2str(w)])
 
 if sum(missing_rows) == 0
@@ -23,5 +31,8 @@ else
 %     K = (P*H1')/(H1*P*H1' + R);
     K(isnan(K)) = 0;
 end
+
+% innovation = NaN(m,1);
+% x_update = K*innovation;
 
 return

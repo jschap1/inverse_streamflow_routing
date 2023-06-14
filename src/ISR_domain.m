@@ -28,7 +28,7 @@ end
 % if opt.loc
 %     disp('using cov localization')
 % end
-opt.quiet = 0;
+opt.quiet = 1;
 opt.timer = 1;
 opt.plot = 0;
 opt.progress = 1;
@@ -226,10 +226,19 @@ if w==32
 end
 
     % log
-    small_number = 1e-4; % to avoid taking log of zero
+    small_number = 1e-4; % to avoid taking log of zero (in case there are zeros in the initial guess)
+%     if all(missing_rows==1) % debugging
+%         1;
+%     elseif sum(missing_rows>0)
+%         1;
+%     elseif sum(missing_rows==0)
+%         1;
+%     end
     tmp = ENKF(log(x_sub+small_number), log(predicted_measurement), log(y), Cv, missing_rows);
 %     tmp = ENKF(log(x_sub), log(predicted_measurement), log(y), Cv, missing_rows);
     x_update = exp(tmp) - small_number;
+    
+%     max(abs(x_update(:) - x_sub(:)))
     
     if max(x_update(:))>1e6 % also chceck for nan/imag
         warning(['Window is ' num2str(w)])

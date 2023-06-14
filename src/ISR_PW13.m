@@ -147,8 +147,12 @@ while i2<=nt % until out of range
     R = sparse(R);
     
     K = kalman_gain_pw13(H, P, R, missing_rows, w);
-    x_update = x + K*innovation;
+    x_update = x + K*innovation; % by having K as sparse, it means 0*nan = 0
 %     P_update = (eye(n*(s+1)) - K*H)*P;
+
+    if any(isnan(x_update))
+        1
+    end
     
     if opt.plotP
         figure

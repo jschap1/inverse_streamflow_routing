@@ -54,7 +54,7 @@ rmsemap = make_map(basin, rmse);
 % figure
 plotraster(basin.lonv, basin.latv, nsemap, 'NSE');
 % colormap(bluewhitered(256)), colorbar
-% caxis([0,1])
+caxis([0,1])
 
 % figure
 % plotraster(basin.lonv, basin.latv, rmsemap, 'RMSE');

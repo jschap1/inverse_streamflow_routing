@@ -62,9 +62,10 @@ nldas_runoff_true(isnan(nldas_runoff_true)) = 0;
 
 %% Generate discharge "measurements" (PW13)
 
-gage = true_discharge; % should corrupt with error
+% gage = true_discharge; % should corrupt with error
 
-% gage = true_discharge_w_swot_sampling; % should corrupt with error
+gage_all = true_discharge;
+gage = true_discharge_w_swot_sampling; % should corrupt with error
 
 % Y20: additive Gaussian error with mu, sigma
 
@@ -86,7 +87,7 @@ lw = 2;
 ind = 1;
 for gg=[1,5,10]
     subplot(1,3,ind)
-    plot(tv, gage(:,gg), 'linewidth', lw)
+    plot(tv, gage_all(:,gg), 'linewidth', lw)
     hold on
     plot(tv, gage_w_error(:,gg), 'red.', 'markersize', 20)
     xlabel('Time')
@@ -134,7 +135,7 @@ tic
 [post_runoff_PW13, Klast] = ISR_PW13(tmpa_runoff_prior, HH, gage, s, 'proportional', alpha1, R);
 toc
 
-save('./ohio_data/ISR_results_PW13_m240.mat', 'post_runoff_PW13', 's', 'alpha1', 'R', 'gage')
+save('./ohio_data/ISR_results_PW13_m240_swot.mat', 'post_runoff_PW13', 's', 'alpha1', 'R', 'gage')
 
 %% Plot overview of results
 
@@ -145,3 +146,4 @@ basin.true_runoff = truth.true_runoff;
 
 gi = (k+1):nt-(k+1);
 plt_ISR_results_overview(basin, tmpa_runoff_prior', post_runoff_PW13', truth, tv, gi)
+

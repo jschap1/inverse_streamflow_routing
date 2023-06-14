@@ -10,14 +10,21 @@ end
 n = size(basin.true_runoff,1);
 
 figure
-subplot(1,2,1)
-[nse, kge, rmse, nsemap] = plot_gofmaps(basin, mean_prior_runoff', truth.total_runoff, gi);
+subplot(1,3,1)
+[nse1, kge, rmse, nsemap] = plot_gofmaps(basin, mean_prior_runoff', truth.total_runoff, gi);
 title('Prior mean (NSE)')
 % title('Prior mean (KGE)')
-subplot(1,2,2)
-[nse, kge, rmse, nsemap] = plot_gofmaps(basin, mean_posterior_runoff', truth.total_runoff, gi);
+subplot(1,3,2)
+[nse2, kge, rmse, nsemap] = plot_gofmaps(basin, mean_posterior_runoff', truth.total_runoff, gi);
 % title('Posterior mean (KGE)')
 title('Posterior mean (NSE)')
+subplot(1,3,3)
+plotraster(basin.lonv, basin.latv, make_map(basin, nse2-nse1), 'sdf')
+title('Improvement in NSE')
+
+% nn = 21; % must be odd
+% cmap = cbrewer2('seq','YlGnBu',nn); % blues at bottom
+% colormap([1,0,0;cmap]); % black for negative values
 
 figure
 plot(tv, mean(mean_prior_runoff,1),'b', 'linewidth', 2)

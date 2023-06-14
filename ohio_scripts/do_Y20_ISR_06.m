@@ -8,7 +8,7 @@ addpath(genpath('./src/'))
 
 load('./ohio_data/ohio_tmpa_nanfilled.mat')
 load('./ohio_data/ohio_nldas_nanfilled.mat')
-load('./ohio_data/swot_like_measurements_100m_no_error.mat')
+load('./ohio_data/swot_like_measurements_100m_no_error_revised.mat')
 
 % add distmat
 A = load('./ohio_data/setup-1-gage.mat');
@@ -21,11 +21,12 @@ tv = datetime(2009,1,1):datetime(2009,12,31);
 
 %% Crop to a shorter domain
 
-% tmax = 50;
-% tv = tv(1:tmax);
-% true_discharge = true_discharge(1:tmax,:);
-% tmpa.runoff = tmpa.runoff(:,:,1:tmax);
-% nldas.runoff = nldas.runoff(:,:,1:tmax);
+tmax = 50;
+tv = tv(1:tmax);
+true_discharge = true_discharge(1:tmax,:);
+true_discharge_w_swot_sampling = true_discharge_w_swot_sampling(1:tmax,:);
+tmpa.runoff = tmpa.runoff(:,:,1:tmax);
+nldas.runoff = nldas.runoff(:,:,1:tmax);
 
 [nt,m] = size(true_discharge);
 
@@ -62,8 +63,8 @@ nldas_runoff_true(isnan(nldas_runoff_true)) = 0;
 
 %% Generate discharge "measurements" (Y20)
 
-gage = true_discharge; % should corrupt with error
-% gage = true_discharge_w_swot_sampling; % should corrupt with error
+% gage = true_discharge; % should corrupt with error
+gage = true_discharge_w_swot_sampling; % should corrupt with error
 
 % Y20: additive Gaussian error with mu, sigma
 
@@ -85,7 +86,7 @@ lw = 2;
 ind = 1;
 for gg=[1,5,10]
     subplot(1,3,ind)
-    plot(tv, gage(:,gg), 'linewidth', lw)
+    plot(tv, true_discharge(:,gg), 'linewidth', lw)
     hold on
     plot(tv, gage_w_error(:,gg), 'red.', 'markersize', 20)
     xlabel('Time')
@@ -141,7 +142,7 @@ tic
 toc
 
 % Save results
-save('./ohio_data/ISR_results_Y20.mat', 'post_runoff_Y20', '-v7.3')
+save('./ohio_data/ISR_results_Y20_swot.mat', 'post_runoff_Y20', '-v7.3')
 
 %% Plot overview of results
 

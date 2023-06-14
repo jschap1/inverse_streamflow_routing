@@ -187,7 +187,7 @@ while i2<=nt % until out of range
     else
         % use covariance (scaling correlation by runoff initial guess)
         tic
-        K = kalman_gain_y20(H, Cx, R, missing_rows, w);
+        K = kalman_gain_y20(H, Cx, R, missing_rows, w); % 8 minutes for swot ohio...
         toc
     end
 %     figure, imagesc(corrmat), colorbar, title('\rho')
@@ -195,6 +195,9 @@ while i2<=nt % until out of range
     end
     
 %     save('./kalman_gain_L100_T0.mat','K','Cx', '-v7.3')
+    
+    % need to get rid of NaN values in innovation to avoid NaNs in x_update
+    innovation(missing_rows) = 1; % K entries are zero for these rows, so no update
     
     x_update = x + K*innovation;
 

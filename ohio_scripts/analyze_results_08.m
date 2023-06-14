@@ -23,13 +23,13 @@ tv = datetime(2009,1,1):datetime(2009,12,31);
 %% Load outputs from ISR
 
 % load PW13 ISR results
-PW13 = load('./ohio_data/ISR_results_PW13_m240.mat');
+PW13 = load('./ohio_data/ISR_results_PW13_m240_swot.mat');
 
 % load Y20 ISR results
 Y20 = load('./ohio_data/ISR_results_Y20_m240.mat');
 
 % load ensemble domain ISR results
-ENS = load('./ohio_data/ISR_results_domain_m240.mat');
+ENS = load('./ohio_data/ISR_results_domain_m240_swot.mat');
 ENS.mean_post_runoff = mean(ENS.post_runoff,3)';
 
 %% Calculate discharge at each gage
@@ -52,6 +52,8 @@ tmpa_runoff_prior(isnan(tmpa_runoff_prior)) = 0;
 nldas_runoff_linear = reshape(nldas.runoff, length(basin_mask_linear), nt);
 nldas_runoff_true = nldas_runoff_linear(logical(basin_mask_linear),:)';
 nldas_runoff_true(isnan(nldas_runoff_true)) = 0;
+
+tmpa.predQ = state_model_dumb(tmpa_runoff_prior, HH);
 
 %% Compare prior, posterior, truth (basin mean)
 
@@ -190,7 +192,7 @@ gi = (k+2):nt-(k+1);
 % gi = 33:40;
 
 basin_in = basin;
-basin_in.mask = flipud(basin_in.mask);
+% basin_in.mask = flipud(basin_in.mask);
 
 nse_min = 0;
 ms = 10;
@@ -223,4 +225,41 @@ hold on
 plot(basin.gage_lon, basin.gage_lat, 'r.', 'markersize', ms)
 caxis([nse_min,1])
 
+%% Reproducing Yang figure 7
+
+% Choose a gage
+% Plot its watershed
+% Plot its discharge, plus our estimates
+
+g1 = 1;
+g2 = 47;
+figure
+subplot(2,2,1)
+plot(tv, true_discharge(:,g1), 'k', 'linewidth', lw)
+hold on
+plot(tv, PW13.predQ(:,g1), 'blue--', 'linewidth', lw)
+plot(tv, Y20.predQ(:,g1), 'red--', 'linewidth', lw)
+plot(tv, ENS.predQ(:,g1), 'cyan', 'linewidth', lw)
+plot(tv, tmpa.predQ(:,g1), 'green--', 'linewidth', lw)
+legend('Truth','PW13','Y20','Ens', 'Prior')
+xlabel('Day')
+ylabel('Discharge (mm/day)')
+
+subplot(2,2,2)
+plotraster(basin.lonv, basin.latv, flipud(basin.mask_gage(:,:,g1)), ['Basin ' num2str(g1)])
+
+subplot(2,2,3)
+plot(tv, true_discharge(:,g2), 'k', 'linewidth', lw)
+hold on
+plot(tv, PW13.predQ(:,g2), 'blue--', 'linewidth', lw)
+plot(tv, Y20.predQ(:,g2), 'red--', 'linewidth', lw)
+plot(tv, ENS.predQ(:,g2), 'cyan', 'linewidth', lw)
+plot(tv, tmpa.predQ(:,g2), 'green--', 'linewidth', lw)
+legend('Truth','PW13','Y20','Ens', 'Prior')
+legend('Truth')
+xlabel('Day')
+ylabel('Discharge (mm/day)')
+
+subplot(2,2,4)
+plotraster(basin.lonv, basin.latv, flipud(basin.mask_gage(:,:,g2)), ['Basin ' num2str(g2)])
 
