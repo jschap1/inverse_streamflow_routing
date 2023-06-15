@@ -135,10 +135,10 @@ rho_thres = exp(-2);
 L = 40; % km
 T = 5; % days
 alpha1 = 1;
-R = (0.15^2);
 
 tic
-[post_runoff_Y20, Klast] = ISR_Y20(tmpa_runoff_prior, HH, gage, s, basin, optionsfile, L, T, rho_thres);
+[post_runoff_Y20, Klast] = ISR_Y20(tmpa_runoff_prior, HH, gage_w_error, s, basin, optionsfile, L, T, rho_thres);
+% [post_runoff_Y20, Klast] = ISR_Y20(tmpa_runoff_prior, HH, gage, s, basin, optionsfile, L, T, rho_thres);
 toc
 
 % Save results

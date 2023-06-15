@@ -23,13 +23,13 @@ tv = datetime(2009,1,1):datetime(2009,12,31);
 %% Load outputs from ISR
 
 % load PW13 ISR results
-PW13 = load('./ohio_data/ISR_results_PW13_m240_swot.mat');
+PW13 = load('./ohio_data/results/ISR_results_PW13_m240_swot.mat');
 
 % load Y20 ISR results
-Y20 = load('./ohio_data/ISR_results_Y20_m240.mat');
+Y20 = load('./ohio_data/results/ISR_results_Y20_m240_swot_badgage.mat');
 
 % load ensemble domain ISR results
-ENS = load('./ohio_data/ISR_results_domain_m240_swot.mat');
+ENS = load('./ohio_data/results/ISR_results_domain_m240_swot.mat');
 ENS.mean_post_runoff = mean(ENS.post_runoff,3)';
 
 %% Calculate discharge at each gage
