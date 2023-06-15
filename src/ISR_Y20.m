@@ -22,6 +22,7 @@ usecorr = 0;
 % read options
 opt = parse_options_file(optionsfile);
 opt.quiet = 1;
+opt.endwindow = 1e5;
 
 if nargin>6
     [L,T,rho_thres] = varargin{:};

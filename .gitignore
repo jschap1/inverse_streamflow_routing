@@ -60,3 +60,4 @@ octave-workspace
 
 # Large files for Ohio basin example
 ohio_data/*
+hh_data/*
