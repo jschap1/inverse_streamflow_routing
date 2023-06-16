@@ -60,21 +60,66 @@ k = 5;
 Tstar = k+1;
 rho_thres = exp(-2);
 % runoff_init = ones(n,nt);
-% runoff_init = 2*truth.total_runoff;
-err = zeros(n,nt);
-for kk=1:n
-    err(kk,:) = mvnrnd(zeros(1,nt), 3*eye(nt));
-end
-runoff_init = truth.total_runoff + err;
+runoff_init = 2*truth.total_runoff;
+% err = zeros(n,nt);
+% for kk=1:n
+%     err(kk,:) = mvnrnd(zeros(1,nt), 3*eye(nt));
+% end
+% runoff_init = truth.total_runoff + err;
+% runoff_init = truth.total_runoff + 2;
 optionsfile = './hh_data/options_hh2.txt';
 
+figure
+subplot(2,2,4)
+plot(tv, mean(runoff_init,1), 'blue', 'linewidth', lw)
+hold on
+plot(tv, mean(truth.total_runoff,1), 'red', 'linewidth', lw)
+legend('Prior mean','True runoff')
+title('White noise error')
+
+%% Calculate true runoff error and export to R (easier to analyze there)
+
+figure
+subplot(1,2,1)
+plotraster(basin.lonv, basin.latv, make_map(basin, runoff_init(:,1)), 'Prior runoff (day 1)')
+subplot(1,2,2)
+plotraster(basin.lonv, basin.latv, make_map(basin, truth.total_runoff(:,1)), 'True runoff (day 1)')
+
+nr = 6;
+nc = 7;
+true_runoff = NaN(nr,nc,nt);
+prior_mean_runoff = NaN(nr,nc,nt);
+for tt=1:nt
+    true_runoff(:,:,tt) = make_map(basin, truth.total_runoff(:,tt));
+    prior_mean_runoff(:,:,tt) = make_map(basin, runoff_init(:,tt));
+end
+
+runoff_error = true_runoff - prior_mean_runoff; % truth - estimate
+
+% what is the runoff error temporal decorrelation length?
+% what is the runoff error spatial decorrelation length?
+
+% reshape to 2D matrix for writing to file
+[nr,nc,nt] = size(runoff_error);
+runoff_error_2d = reshape(runoff_error, nr*nc, nt);
+dlmwrite('./hh_data/uncorr_prior_error.txt', runoff_error_2d, 'delimiter', '\t')
+dlmwrite('./hh_data/distmat.txt', basin.distmat, 'delimiter', '\t')
+
+for tt=1:nt
+    [x,y,z] = grid2xyz(basin.lonv(1:end-1)', basin.latv', runoff_error(:,:,tt)); % bc lonv is too long
+    dlmwrite(['./hh_data/runoff_error_xyz/uncorr_xyz' num2str(tt) '.txt'], [x,y,z], 'delimiter', '\t')
+end
+
 %%
+
 nL = 11;
-nT = 10;
-Lfrac = linspace(0.01, 3, nL);
+nT = 12;
+Lfrac = linspace(0.01, 30, nL);
 Tfrac = linspace(0.01, 3, nT);
 nsemin = zeros(nL,nT);
 nsemean = zeros(nL,nT);
+
+s=2*k+1;
 
 tic
 for ii = 1:nL
@@ -82,7 +127,7 @@ for ii = 1:nL
 
         L = Lfrac(ii)*Lstar; % km
         T = Tfrac(jj)*Tstar; % hours
-        [runoff, K] = ISR_Y20(runoff_init', HH, error_corrupted_discharge_meas, ...
+        [runoff, K] = ISR_Y20(runoff_init', HH, error_corrupted_discharge_meas_swot, ...
             s, basin, optionsfile, L, T, rho_thres); % Y20 method
 
         !rm ./hh_data/SC*
@@ -103,29 +148,29 @@ for ii = 1:nL
 end
 toc
 
-%% It looks like larger T is bad, past a certain point
+%% Plot surf of NSE from each L,T combo
 
 [LL, TT] = meshgrid(Lfrac, Tfrac);
 
 figure
-subplot(1,2,1)
+% subplot(1,2,1)
 surf(LL, TT, nsemean')
 colorbar
-title('mean nse')
+title('2x truth prior, swot meas')
 xlabel('L/L*')
 ylabel('T/T*')
 zlabel('mean nse')
 % caxis([-1,1])
 % set(gca,'YDir','reverse') 
 
-subplot(1,2,2)
-surf(LL, TT, nsemin')
-colorbar
-% caxis([-1,1])
-title('min nse')
-xlabel('L/L*')
-ylabel('T/T*')
-zlabel('min nse')
+% subplot(1,2,2)
+% surf(LL, TT, nsemin')
+% colorbar
+% % caxis([-1,1])
+% title('min nse')
+% xlabel('L/L*')
+% ylabel('T/T*')
+% zlabel('min nse')
 
 %% Look at outputs
 

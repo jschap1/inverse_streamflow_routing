@@ -1,22 +1,22 @@
-# Estimating L and T for NLDAS vs. TMPA runoff
+# Estimating L and T for HH
 #
-# 6/12/2023 JRS
+# 6/15/2023 JRS
 
 library(sp)
 library(gstat)
 library(rgdal)
 
-  # Load in NLDAS - TMPA errors ----------------------------------------
+# Load in NLDAS - TMPA errors ----------------------------------------
 
-setwd("/home/jschap/Documents/ISR/inverse_streamflow_routing/")
-err <- as.matrix(read.table("./ohio_data/nldas_tmpa_error.txt", 
-                  header = FALSE
-                  ))
+setwd("/hdd/ISR/inverse_streamflow_routing")
+err <- as.matrix(read.table("./hh_data/doubletruth_prior_error.txt", 
+                            header = FALSE
+))
 
 # Determine the dimensions of the 2D matrix
-nr <- 72
-nc <- 104
-nt <- 365
+nr <- 6
+nc <- 7
+nt <- 721
 
 # Reconstruct the 3D array from the 2D matrix
 err.3D <- array(err, dim = c(nr, nc, nt))
@@ -33,9 +33,12 @@ for (i in 1:n)
 }
 errdf <- as.data.frame(t(errmat))
 
-tv <- seq(from = as.Date("2009-01-01"), by = "day", length.out = nt)
+tv <- seq(from = as.POSIXct("2006-05-01 00:00:00"), 
+          by = "hour", 
+          length.out = nt)
+
 errdf <- cbind(tv, errdf)
-colnames(errdf) <- c("Time", paste0("Cell_", 1:3681))
+colnames(errdf) <- c("Time", paste0("Cell_", 1:n))
 
 maxlag <- vector(length = n)
 for (c in 1:n)
@@ -61,7 +64,7 @@ acf.basin.avg <- acf(as.data.frame(err.basin.avg), plot=TRUE)
 acf.fit.data <- data.frame(lag = acf.basin.avg$lag, 
                            acf = acf.basin.avg$acf,
                            logacf = log(acf.basin.avg$acf)
-                           )
+)
 
 fit1 <- lm(log(acf)~lag+0, acf.fit.data)
 summary(fit1)
@@ -74,7 +77,7 @@ plot(acf.basin.avg$lag, acf.basin.avg$acf,
      xlab = "lag", 
      ylab = "Temporal correlation", 
      main = "Fit vs Data"
-     )
+)
 
 # Add the fitted values to the plot
 lines(acf.basin.avg$lag, predicted, col = "red")
@@ -98,22 +101,22 @@ calc_T <- function(ts)
 {
   
   nt <- 365
-
+  
   acf.cell <- acf(as.data.frame(ts), plot=FALSE)
   
-  # # Keep only significant lag correlations (if desired)
-  # consecutive_numbers <- which(acf.cell$acf>2/sqrt(nt))
-  # # For white noise, 95% of ACF values should be in ±2/√T, where T = 365
-  # maxlag <- which(diff(consecutive_numbers)>1)[1]
-  # if (is.na(maxlag))
-  # {
-  #   maxlag <- consecutive_numbers[length(consecutive_numbers)]
-  # }
-  # acf.cell <- acf.cell[0:maxlag,]
+  # Keep only significant lag correlations (if desired)
+  consecutive_numbers <- which(acf.cell$acf>2/sqrt(nt))
+  # For white noise, 95% of ACF values should be in ±2/√T, where T = 365
+  maxlag <- which(diff(consecutive_numbers)>1)[1]
+  if (is.na(maxlag))
+  {
+    maxlag <- consecutive_numbers[length(consecutive_numbers)]
+  }
+  acf.cell <- acf.cell[0:maxlag,]
   
   # Fit a correlation function of the form rho(tau) = exp(-tau/T)
   acf.cell.data <- data.frame(lag = acf.cell$lag, 
-                             acf = acf.cell$acf
+                              acf = acf.cell$acf
   )
   
   fit1 <- lm(log(acf)~lag+0, acf.cell.data)
@@ -139,13 +142,13 @@ calc_T <- function(ts)
 
 # Spatial correlation analysis ----------------------------------------
 
-distmat <- read.table("./ohio_data/distmat.txt", 
+distmat <- read.table("./hh_data/distmat.txt", 
                       header = FALSE)
 
 L <- vector(length = nt)
 for (tt in 1:nt)
 {
-  runoff_error_snapshot <- paste0("./ohio_data/runoff_error_xyz/xyz", tt, ".txt")
+  runoff_error_snapshot <- paste0("./hh_data/runoff_error_xyz/dbltruth_xyz", tt, ".txt")
   L[tt] <- calc_L(runoff_error_snapshot)
 }
 
@@ -164,16 +167,19 @@ calc_L <- function(runoff_error_snapshot)
   # Assign the CRS to the spdf object
   proj4string(spdf) <- crs
   
-  variogram_model <- variogram(err ~ 1, data = spdf)
-  # plot(variogram_model, xlab = "distance (km)")
+    variogram_model <- variogram(err ~ 1, data = spdf)
+    # plot(variogram_model, xlab = "distance (km)")
+    
+    vgm.control(maxit = 1000)
+    vfit <- fit.variogram(variogram_model, 
+                          model = vgm(model = "Sph", psill = 2, range = 5)
+                          )
+    L <- vfit$range[1] # km
+    
+    # plot(vfit, cutoff = 15, add=TRUE)
+    plot(variogram_model, vfit)
   
-  vfit <- fit.variogram(variogram_model, 
-                        model = vgm("Exp", nugget = 0))
-  L <- vfit$range[2] # km
-  
-  # plot(vfit)
-  
-  return(L)
+    return(L)
   
 }
 
