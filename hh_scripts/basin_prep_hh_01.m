@@ -46,7 +46,7 @@ yllcorner = min(lat);
 
 georef = [xllcorner, yllcorner, cellsize, nodata_value];
 
-gage_list = load('./hh_data/station_list_5.txt');
+gage_list = load('./hh_data/station_list_1.txt');
 m = size(gage_list,1);
 
 % Do basin analysis. Includes snapping of gauges to flow map
@@ -94,4 +94,10 @@ truth.discharge_mm = state_model_dumb(truth.total_runoff', HH);
 
 %% Save ISR inputs
 
-save('./hh_data/isr_setup_usds_gage_5.mat', 'basin', 'truth', 'flow_vel', 'k', 'HH', 'fdir')
+basin.mask(isnan(basin.mask)) = 0;
+basin.mask = logical(basin.mask);
+basin.lon = basin.grid_lon(basin.mask);
+basin.lat = basin.grid_lat(basin.mask);
+basin.distmat = calc_distance_matrix(basin.lon, basin.lat);
+
+save('./hh_data/isr_setup_1.mat', 'basin', 'truth', 'flow_vel', 'k', 'HH', 'fdir')

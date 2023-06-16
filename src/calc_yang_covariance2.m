@@ -32,7 +32,14 @@ if nargin == 5
 %     imagesc(TC(1:5*n,1:5*n))
 %     colorbar
 
-    rho_x = SC.*TC;
+    try
+        rho_x = SC.*TC;
+    catch
+        disp('Converting SC and TC to singles')
+        SC = single(full(SC)); % in case SC and TC have different data types
+        TC = single(full(TC));
+        rho_x = SC.*TC;
+    end
     save(opt.rho_savename, 'rho_x', '-v7.3')
     clearvars SC TC      
     

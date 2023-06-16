@@ -9,7 +9,45 @@
 % Accounts for missing data
 % Assumes H, P, R are singles, but could be adapted for sparse matrices
 
-function K = kalman_gain_y20(H, P, R, missing_rows, w)
+function K = kalman_gain_y20(H, P, R, missing_rows, w, varargin)
+
+if nargin>5
+    sparseflag = varargin{1};
+    disp('Using sparse matrices for kalman gain')
+else
+    sparseflag = 0;
+    disp('Using singles for kalman gain')
+end
+
+switch sparseflag
+    
+    case 1
+        
+        % Make any single matrices sparse
+        if ~issparse(P)
+            P = sparse(P);
+        end
+        if ~issparse(H)
+            H = sparse(H);
+        end
+        if ~issparse(R)
+            R = sparse(R);
+        end
+        
+    case 0
+        
+        % Make any sparse matrices full
+        if issparse(P)
+            P = single(full(P));
+        end
+        if issparse(H)
+            H = single(full(H));
+        end
+        if issparse(R)
+            R = single(full(R));
+        end
+        
+end
 
 % Cut to size for debugging
 % m = 240;

@@ -62,59 +62,11 @@ set(gca, 'fontsize',fs)
 
 %% EnKF implementation
 
-% Generate ensemble of runoff initial guesses
-% (can think of this as ensemble of state at initial time x0)
-% We will use the true runoff plus errors
-% The errors will be multiplicative lognormal errors with some mu, sigma
-% (ultimately, this should be done with CoSMoS with realistic errors)
-
 s = 2*k+1;
-% s = k+1;
-% s = k+18; % 24 hour window
-mean1 = 0.2;
-std1 = 1;
-mu1 = log((mean1^2)/sqrt(std1+mean1^2));
-sigma1 = sqrt(log(std1/(mean1^2)+1));
-[n, nt] = size(truth.total_runoff);
-m = size(true_discharge,2); % number of gages 
-
-% Generate synthetic measurements
-% ENKF() assumes homoscedastic, uncorrelated lognormal errors here
-% we will use unbiased relative error of 15% (COV=0.15, mu = 1)
-mean1 = 1;
-% Cv = 0.15;
-Cv = (0.15)^2; % variance
-mu1 = log((mean1^2)/sqrt(Cv+mean1^2));
-sigma1 = sqrt(log(Cv/(mean1^2)+1));
-v = lognrnd(mu1, sigma1, 1e5, 1);
-% figure
-% histogram(v)
-mean(v)
-std(v)
-
-error_corrupted_discharge_meas = true_discharge.*lognrnd(mu1, sigma1, nt, m);
-
-% What if we have sparse temporal measurements?
-
-m = 5;
-true_discharge_SWOT_sampling = NaN(nt,m);
-true_discharge_SWOT_sampling(1:10:end,:) = true_discharge(1:10:end,:);
-error_corrupted_discharge_meas_SWOT = true_discharge_SWOT_sampling.*lognrnd(mu1, sigma1, nt, m);
-
-figure
-imagescnan(error_corrupted_discharge_meas_SWOT)
-xlabel('gage')
-ylabel('time')
-title('SWOT discharge measurements')
-colorbar
-
-% figure
-% plot(tv, true_discharge)
-% hold on
-% plot(tv, error_corrupted_discharge_meas)
-% legend('True discharge','Synthetic measurements')
-% xlabel('Time')
-% ylabel('Q (mm/day)')
+mn = 1;
+sd = 0.15;
+error_corrupted_discharge_meas = generate_discharge_measurements(true_discharge, 'norm', mn, sd, 1,0);
+error_corrupted_discharge_meas_swot = generate_discharge_measurements(true_discharge, 'norm', mn, sd, 1,1);
 
 %% Use mvlognrnd to generate uncorrelated errors
 
