@@ -2,6 +2,7 @@
 #
 # 6/15/2023 JRS
 
+rm(list=ls())
 library(sp)
 library(gstat)
 library(rgdal)
@@ -9,7 +10,7 @@ library(rgdal)
 # Load in NLDAS - TMPA errors ----------------------------------------
 
 setwd("/hdd/ISR/inverse_streamflow_routing")
-err <- as.matrix(read.table("./hh_data/doubletruth_prior_error.txt", 
+err <- as.matrix(read.table("./hh_data/uncorr_prior_error.txt", 
                             header = FALSE
 ))
 
@@ -148,9 +149,12 @@ distmat <- read.table("./hh_data/distmat.txt",
 L <- vector(length = nt)
 for (tt in 1:nt)
 {
-  runoff_error_snapshot <- paste0("./hh_data/runoff_error_xyz/dbltruth_xyz", tt, ".txt")
+  runoff_error_snapshot <- paste0("./hh_data/runoff_error_xyz/uncorr_xyz", tt, ".txt")
   L[tt] <- calc_L(runoff_error_snapshot)
 }
+L
+summary(L)
+hist(L, "FD")
 
 calc_L <- function(runoff_error_snapshot)
 {
@@ -170,14 +174,13 @@ calc_L <- function(runoff_error_snapshot)
     variogram_model <- variogram(err ~ 1, data = spdf)
     # plot(variogram_model, xlab = "distance (km)")
     
-    vgm.control(maxit = 1000)
     vfit <- fit.variogram(variogram_model, 
-                          model = vgm(model = "Sph", psill = 2, range = 5)
+                          model = vgm(model = "Exp")
                           )
     L <- vfit$range[1] # km
     
     # plot(vfit, cutoff = 15, add=TRUE)
-    plot(variogram_model, vfit)
+    # plot(variogram_model, vfit)
   
     return(L)
   

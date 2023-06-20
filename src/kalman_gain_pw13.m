@@ -16,7 +16,15 @@ if sum(missing_rows) == 0
 %     disp(['Using pinv for window ' num2str(w)])
     % using sparse matrix: 257 seconds per window for m=240, s=2*(k+1), n = 3681
     % using sparse matrix: 52 seconds per window for m=240, s=k+1, n = 3681
+
     K = (P*H')/(H*P*H' + R);
+    % For debugging
+%     m=1000;
+%     n=117792;
+%     tic
+%     K = (P(1:n,1:n)*H(1:m,1:n)')/(H(1:m,1:n)*P(1:n,1:n)*H(1:m,1:n)' + R(1:m,1:m));
+%     toc
+    
 %     K = (P*H')*pinv(H*P*H' + R);
 else
     H1 = H;
