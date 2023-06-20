@@ -10,7 +10,7 @@ clear, clc, close all
 cd('/hdd/ISR/inverse_streamflow_routing')
 addpath(genpath('./src/'))
 
-load('./hh_data/isr_setup_1.mat')
+load('./hh_data/isr_setup_5.mat')
 basin.mask = flipud(basin.mask);
 % 
 % basin.lon = basin.grid_lon(basin.mask);
@@ -59,16 +59,17 @@ Lstar = sqrt(basin.gage_area(1)/1000^2);
 k = 5;
 Tstar = k+1;
 rho_thres = exp(-2);
-% runoff_init = ones(n,nt);
-runoff_init = 2*truth.total_runoff;
-% err = zeros(n,nt);
-% for kk=1:n
-%     err(kk,:) = mvnrnd(zeros(1,nt), 3*eye(nt));
-% end
-% runoff_init = truth.total_runoff + err;
-% runoff_init = truth.total_runoff + 2;
+runoff_init = ones(n,nt);
+% runoff_init = 2*truth.total_runoff;
+err = zeros(n,nt);
+for kk=1:n
+    err(kk,:) = mvnrnd(zeros(1,nt), 3*eye(nt));
+end
+runoff_init = truth.total_runoff + err;
+runoff_init = truth.total_runoff + 2;
 optionsfile = './hh_data/options_hh2.txt';
 
+lw=2;
 figure
 subplot(2,2,4)
 plot(tv, mean(runoff_init,1), 'blue', 'linewidth', lw)
@@ -114,8 +115,8 @@ end
 
 nL = 11;
 nT = 12;
-Lfrac = linspace(0.01, 30, nL);
-Tfrac = linspace(0.01, 3, nT);
+Lfrac = linspace(0.01, 2, nL);
+Tfrac = linspace(0.01, 2, nT);
 nsemin = zeros(nL,nT);
 nsemean = zeros(nL,nT);
 
@@ -156,7 +157,7 @@ figure
 % subplot(1,2,1)
 surf(LL, TT, nsemean')
 colorbar
-title('2x truth prior, swot meas')
+title('White noise prior, swot meas')
 xlabel('L/L*')
 ylabel('T/T*')
 zlabel('mean nse')

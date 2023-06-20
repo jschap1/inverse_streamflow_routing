@@ -3,7 +3,8 @@
 % 6/5/2023 JRS
 
 clear, clc, close all
-cd /Volumes/HD3/ISR/inverse_streamflow_routing
+cd /hdd/ISR/inverse_streamflow_routing
+% cd /Volumes/HD3/ISR/inverse_streamflow_routing
 addpath(genpath('./src/'))
 
 load('./ohio_data/ohio_tmpa_nanfilled.mat')
@@ -34,14 +35,15 @@ tv = datetime(2009,1,1):datetime(2009,12,31);
 % TMPA prior, NLDAS truth
 
 figure
-t=73:77;
-for i=1:5
-    subplot(2,5,i)
+t=75:77;
+cmax = 2.5;
+for i=1:3
+    subplot(2,3,i)
     plotraster(basin.lonv, basin.latv, tmpa.runoff(:,:,t(i)), ['TMPA runoff (day ' num2str(t(i)) ')'])
-    caxis([0,6])
-    subplot(2,5,5+i)
+    caxis([0,cmax])
+    subplot(2,3,3+i)
     plotraster(basin.lonv, basin.latv, nldas.runoff(:,:,t(i)), ['NLDAS runoff (day ' num2str(t(i)) ')'])
-    caxis([0,6])
+    caxis([0,cmax])
 end
 colormap cool
 
@@ -65,21 +67,15 @@ nldas_runoff_true(isnan(nldas_runoff_true)) = 0;
 % gage = true_discharge; % should corrupt with error
 
 gage_all = true_discharge;
-gage = true_discharge_w_swot_sampling; % should corrupt with error
+gage = true_discharge; % should corrupt with error
+% gage = true_discharge_w_swot_sampling; % should corrupt with error
 
 % Y20: additive Gaussian error with mu, sigma
 
 mu1 = 0; % mean of additive error
-% sigma1 = 0.3*gage; % stddev of additive error (30% of truth)
-for tt=1:nt
-    for mm=1:m
-        sigma1 = 0.15*gage(tt,mm);
-        add_err(tt,mm) = mu1 + sigma1*randn(1,1);
-    end
-    disp(tt)
-end
+sigma1 = 0.30*gage; % stddev of additive error (30% of truth)
+add_err = mu1 + sigma1.*randn(nt,m);
 gage_w_error = gage + add_err;
-% add_err = mu1 + sigma1.*randn(nt,m);
 
 % Plot error for several gages
 figure
@@ -95,7 +91,6 @@ for gg=[1,5,10]
     ylabel('Discharge (mmd/day)')
     ind = ind + 1;
 end
-% ensemble ISR: multiplicative LN error with mean, stddev
 
 err = true_discharge(:) - gage_w_error(:);
 nanmean(err)
@@ -103,6 +98,15 @@ nanstd(err)
 
 figure
 histogram(err)
+% why does this histogram not look gaussian?
+% because each outcome is from a different distribution, with a different
+% standard deviation (sigma varies for each observation)
+% If we repeated this many times, then there would be Gaussian dists
+
+% y = rand(1000,50);
+% yobs = y + randn(1000, 50);
+% figure
+% histogram(yobs-y);
 
 %% Plot discharge "measurements" (PW13)
 
@@ -125,17 +129,23 @@ set(gca, 'fontsize', fs)
 
 % runoff_init = ones(nt,n);
 
-% s = k+1;
-s = 2*(k+1)-1; % for window of length 32 days
-alpha1 = 1;
-R = (0.15^2); % meas error covariance
+s = k+1;
+% s = 2*(k+1)-1; % for window of length 32 days
+cov = 1; % coefficient of variation
+% R = (0.15^2); % meas error covariance
+R = 0;
 
-% takes about 1.5 hr with these parameters on my PC
+totmean = mean(nldas.runoff_mean);
+totsd = std(nldas.runoff_mean);
+runoff_init = ones(nt, n)*totmean;
+
+% takes about 1.5 hr with these parameters on my office PC
 tic
-[post_runoff_PW13, Klast] = ISR_PW13(tmpa_runoff_prior, HH, gage_w_error, s, 'proportional', alpha1, R);
+% [post_runoff_PW13] = ISR_PW13(tmpa_runoff_prior, HH, gage, s, 'proportional', cov, R);
+[post_runoff_PW13] = ISR_PW13(runoff_init, HH, gage, s, 'const_diag', totsd, R);
 toc
 
-save('./ohio_data/ISR_results_PW13_m240_swot_revised.mat', 'post_runoff_PW13', 's', 'alpha1', 'R', 'gage')
+save('./ohio_data/ISR_results_PW13_m240_daily_no_err_null.mat', 'post_runoff_PW13', 's', 'cov', 'R', 'gage')
 
 %% Plot overview of results
 

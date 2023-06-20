@@ -55,7 +55,9 @@ L = sparse(L);
 proportional = 0;
 switch P_option
     case 'const_diag'
-        P = a*speye(n*(s+1));
+        % Under this assumption, K does not change from window to window
+        P = alpha1^2*speye(n*(s+1));
+        K = H'/(H*H');
     case 'proportional'
         P = alpha1^2*speye(n*(s+1));
         proportional = 1;
@@ -70,11 +72,6 @@ switch P_option
         P(7:7:end) = -1*b;
 end
     
-% depending on our assumptions, K may not change from window to window
-% if ~proportional
-%     K = ISR_Kalman_Gain(H, P, R, zeros(s+1,1), 1);
-% end
-
 % loop over smoothing windows
 w = 1; % window number
 i2 = 0; % initialize while loop
@@ -146,7 +143,10 @@ while i2<=nt % until out of range
     R = (meas_err)*R;
     R = sparse(R);
     
-    K = kalman_gain_pw13(H, P, R, missing_rows, w);
+    if strcmp(P_option, 'proportional')
+        K = kalman_gain_pw13(H, P, R, missing_rows, w);
+        % otherwise K could be time-invariant
+    end
     x_update = x + K*innovation; % by having K as sparse, it means 0*nan = 0
 %     P_update = (eye(n*(s+1)) - K*H)*P;
 
