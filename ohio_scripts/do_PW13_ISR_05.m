@@ -135,7 +135,7 @@ tic
 [post_runoff_PW13, Klast] = ISR_PW13(tmpa_runoff_prior, HH, gage_w_error, s, 'proportional', alpha1, R);
 toc
 
-save('./ohio_data/ISR_results_PW13_m240_swot.mat', 'post_runoff_PW13', 's', 'alpha1', 'R', 'gage')
+save('./ohio_data/ISR_results_PW13_m240_swot_revised.mat', 'post_runoff_PW13', 's', 'alpha1', 'R', 'gage')
 
 %% Plot overview of results
 

@@ -20,16 +20,32 @@ tv = datetime(2009,1,1):datetime(2009,12,31);
 
 [nt,m] = size(true_discharge);
 
-%% Load outputs from ISR
+%% Load outputs from ISR (daily meas)
 
 % load PW13 ISR results
-PW13 = load('./ohio_data/results/ISR_results_PW13_m240_swot.mat');
+PW13 = load('./ohio_data/results/final/ISR_results_PW13_m240.mat');
 
 % load Y20 ISR results
-Y20 = load('./ohio_data/results/ISR_results_Y20_m240_swot_badgage.mat');
+Y20 = load('./ohio_data/results/final/ISR_results_Y20_m240.mat');
 
 % load ensemble domain ISR results
-ENS = load('./ohio_data/results/ISR_results_domain_m240_swot.mat');
+ENS = load('./ohio_data/results/final/ISR_results_domain_m240.mat');
+ENS.mean_post_runoff = mean(ENS.post_runoff,3)';
+
+% need to re-run domain and Y20 no swot with proper gauge errors
+% need to fix any NaNs in the Y20 outcomes
+% should do runs with much larger L, T
+
+%% Load outputs from ISR (swot meas)
+
+% load PW13 ISR results
+PW13 = load('./ohio_data/results/final/ISR_results_PW13_m240_swot_revised.mat');
+
+% load Y20 ISR results
+Y20 = load('./ohio_data/results/final/ISR_results_Y20_swot.mat');
+
+% load ensemble domain ISR results
+ENS = load('./ohio_data/results/final/ISR_results_domain_m240_swot.mat');
 ENS.mean_post_runoff = mean(ENS.post_runoff,3)';
 
 %% Calculate discharge at each gage
@@ -77,7 +93,7 @@ h5 = plot(tv, mean_true_runoff, 'linewidth', lw, 'color', 'k');
 set(gca, 'fontsize', fs)
 
 % add vertical lines at key times
-t = [42, 73, 81, 336];
+t = [42, 73, 88, 180];
 ymax = 14;
 plot([tv(t(1)) tv(t(1))],[0 ymax], 'k-')
 plot([tv(t(2)) tv(t(2))],[0 ymax], 'k-')
@@ -101,8 +117,8 @@ Y20.post_bias = mean(mean(Y20.post_runoff_Y20,2))/mean(mean_true_runoff);
 PW13.minval = min(PW13.post_runoff_PW13, [], 2);
 Y20.minval = min(Y20.post_runoff_Y20, [], 2);
 
-t=[42, 73, 88, 336];
-cbnds = [-1,20;-1,6;-1,6;-1,10];
+t = [42, 73, 88, 180];
+cbnds = [-1,15;-1,6;-1,10;-1,3];
 
 plot_runoff_map_snapshots(t, cbnds, basin, PW13.post_runoff_PW13, ...
     Y20.post_runoff_Y20, ENS.mean_post_runoff, tmpa, nldas);
@@ -121,6 +137,69 @@ plotraster(basin.lonv, basin.latv, basin.ds_gages, 'ds gages')
 
 %% Plot map of how many other cells this cell has to share a gage with?
 
+% Sort gauges from upstream to downstream (by drainage area)
+
+[gage_area_sorted,ind_inc_DA] = sort(basin.gage_area, 'descend'); % gauges, sorted from ds to us
+% Loop over gauges from smallest basin to largest basin
+% Populate map with number of competing grid cells
+
+% basin.mask(isnan(basin.mask)) = 0;
+% basin.mask = logical(double(basin.mask));
+competing_gages = basin.mask;
+bmask = basin.mask;
+bmask(isnan(bmask))=0;
+bmask = logical(bmask);
+
+for mm=1:m
+    % for first subbasin,
+    current_gage = ind_inc_DA(mm);
+    current_mask = flipud(basin.mask_gage(:,:,current_gage));
+    ncells_in_subbasin = nansum(current_mask(:));
+    
+    % get index of current subbasin cells
+    
+    current_mask_lin = current_mask(:) == 1;
+    ind_current_basin = find(current_mask_lin);
+    
+%     [ii1, ii2] = find(current_mask == 1);
+    competing_gages(ind_current_basin) = ncells_in_subbasin;
+end
+
+figure
+plotraster(basin.lonv, basin.latv, competing_gages, 'Competing grid cells')
+% hold on
+% plot(basin.gage_lon, basin.gage_lat, 'r.', 'markersize', 20)
+colormap(flipud(parula(50)))
+
+%% Is there a correlation between posterior NSE and #competinggages
+
+for kk=1:n
+%     nse_post(kk) = myNSE(nldas_runoff_true(:,kk), PW13.post_runoff_PW13(:,kk));
+    nse_post(kk) = myNSE(nldas_runoff_true(:,kk), Y20.post_runoff_Y20(:,kk));
+%     nse_post(kk) = myNSE(nldas_runoff_true(:,kk), ENS.mean_post_runoff(:,kk));
+    nse_prior(kk) = myNSE(nldas_runoff_true(:,kk), tmpa_runoff_prior(:,kk));
+end
+
+nse_post_map = make_map(basin, nse_post);
+nse_change_map = make_map(basin, nse_post - nse_prior);
+
+figure
+plotraster(basin.lonv, basin.latv, nse_post_map, 'NSE post')
+caxis([0,1])
+
+figure
+plotraster(basin.lonv, basin.latv, nse_change_map, 'NSE change')
+
+figure
+plot(competing_gages(:)/3681, nse_change_map(:), 'k.')
+xlabel('# competing')
+ylabel('NSE change')
+
+figure
+plot(competing_gages(:)/3681, nse_post_map(:), 'k.')
+xlabel('# competing')
+ylabel('post NSE')
+
 %% Plot map of sub-basins?
 
 % smaller subbasins should have better results
@@ -137,7 +216,58 @@ figure,imagesc(basin.mask_gage(:,:,1))
 
 %% Plot runoff timeseries for selected grid cells
 
-gc = []; % grid cells to plot
+basin.lon = basin.grid_lon(flipud(bmask));
+basin.lat = basin.grid_lat(flipud(bmask));
+
+gc = [1410,199, 50, 3000]; % grid cells to plot
+
+% [ii1,ii2] = ind2sub(size(basin.mask), gc(kk));
+% 
+% % get index in basin_mask of the cell I want to plot
+% plotlon = -85.75
+% plotlat = 39
+
+gi = gi';
+figure
+for kk=1:length(gc)
+    
+    subplot(2,2,kk)
+    plot(tv, tmpa_runoff_prior(:, gc(kk)), 'green*', 'linewidth', lw);
+    hold on
+    plot(tv, PW13.post_runoff_PW13(:, gc(kk)), 'linewidth', lw, 'color', 'blue');
+    plot(tv, Y20.post_runoff_Y20(:,gc(kk)), 'linewidth', lw, 'color', 'cyan');
+    plot(tv, ENS.mean_post_runoff(:, gc(kk)), 'r--', 'linewidth', lw);
+    plot(tv, nldas_runoff_true(:, gc(kk)), 'linewidth', lw, 'color', 'k');
+    legend('TMPA (prior)','PW13','Y20','ENS','NLDAS (true)')
+    title(['Grid cell' num2str(gc(kk))])
+%     xlim([datetime(2009,6,1), datetime(2009,9,1)])
+    ylim([-3,30])
+
+    nse_prior = myNSE(nldas_runoff_true(gi, gc(kk)), tmpa_runoff_prior(gi, gc(kk)));
+    nse_PW13 = myNSE(nldas_runoff_true(gi, gc(kk)), PW13.post_runoff_PW13(gi, gc(kk)));
+    nse_Y20 = myNSE(nldas_runoff_true(gi, gc(kk)), Y20.post_runoff_Y20(gi,gc(kk)));
+    nse_ENS = myNSE(nldas_runoff_true(gi, gc(kk)), ENS.mean_post_runoff(gi, gc(kk)));
+    text(7, 10, ['Prior NSE: ' num2str(nse_prior)])
+    text(7, 15, ['PW13 NSE: ' num2str(nse_PW13)])
+    text(7, 20, ['Y20 NSE: ' num2str(nse_Y20)])
+    text(7, 25, ['ENS NSE: ' num2str(nse_ENS)])
+    set(gca, 'fontsize', fs)
+    
+end
+%%
+% Plot a map showing these points on the runoff NSE map
+for kk=1:n
+    nse_post(kk) = myNSE(nldas_runoff_true(:,kk), Y20.post_runoff_Y20(:,kk));
+end
+nse_post_map = make_map(basin, nse_post);
+
+figure
+plotraster(basin.lonv, basin.latv, nse_post_map, 'nse')
+caxis([0,1])
+hold on
+plot(basin.lon(gc(kk)), basin.lat(gc(kk)), 'r.')
+
+
 
 figure
 
@@ -197,28 +327,28 @@ basin_in = basin;
 nse_min = 0;
 ms = 10;
 figure
-subplot(1,4,1)
+subplot(2,2,1)
 [nse, kge, rmse, nsemap] = plot_gofmaps(basin_in, tmpa_runoff_prior, nldas_runoff_true', gi);
 hold on 
 plot(basin.gage_lon, basin.gage_lat, 'r.', 'markersize', ms)
 title('TMPA Prior NSE')
 caxis([nse_min,1])
 
-subplot(1,4,2)
+subplot(2,2,2)
 [nse, kge, rmse, nsemap] = plot_gofmaps(basin_in, PW13.post_runoff_PW13, nldas_runoff_true', gi);
 hold on 
 plot(basin.gage_lon, basin.gage_lat, 'r.', 'markersize', ms)
 title('PW13 Posterior NSE')
 caxis([nse_min,1])
 
-subplot(1,4,3)
+subplot(2,2,3)
 [nse, kge, rmse, nsemap] = plot_gofmaps(basin_in, Y20.post_runoff_Y20, nldas_runoff_true', gi);
 hold on 
 plot(basin.gage_lon, basin.gage_lat, 'r.', 'markersize', ms)
 title('Y20 Posterior NSE')
 caxis([nse_min,1])
 
-subplot(1,4,4)
+subplot(2,2,4)
 [nse, kge, rmse, nsemap] = plot_gofmaps(basin_in, ENS.mean_post_runoff, nldas_runoff_true', gi);
 title('ENS Posterior NSE')
 hold on 
