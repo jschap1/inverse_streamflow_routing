@@ -2,7 +2,7 @@
 
 function TC = calc_TC(k2, rho_thres, n, s, RAM)
 
-disp('Calculating temporal correlation matrix')
+% disp('Calculating temporal correlation matrix')
 % note: the minimum size for TC can be quite large even for 
 % small T bc of the block diagonal of ones
 
@@ -21,20 +21,20 @@ percent_nonzero_thres = (n*(s+1)*n*(s+1)-2*n*(s+1)-2)/(4*n*(s+1)*n*(s+1));
 nnz = percent_nonzero*(n*(s+1))^2;
 D = max(nnz,1)*16+8*(n*(s+1)+1);
 D = D/1e9; % memory requirement (GB)
-disp(['Sparse matrix will require ' num2str(D) ' GB of memory'])
+% disp(['Sparse matrix will require ' num2str(D) ' GB of memory'])
 
 % memory required for the single matrix
 S = 4*((n*(s+1))^2)/1e9;
-disp(['Single-precision matrix will require ' num2str(S) ' GB of memory'])
+% disp(['Single-precision matrix will require ' num2str(S) ' GB of memory'])
 
 if percent_nonzero < percent_nonzero_thres
     % use sparse
-    disp('Using sparse matrix for TC')
+%     disp('Using sparse matrix for TC')
     TC = sparse(n*(s+1),n*(s+1));
 else
     % use single
-    disp('There are many non-zero values in TC')
-    disp('Using single precision matrix for TC')
+%     disp('There are many non-zero values in TC')
+%     disp('Using single precision matrix for TC')
     TC = zeros(n*(s+1),n*(s+1), 'single');
 end
 

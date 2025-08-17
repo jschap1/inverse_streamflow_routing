@@ -2,6 +2,11 @@
 
 function NSE = myNSE(y, y_hat)
 
+if size(y,1)<size(y,2)
+    y = y';
+    y_hat = y_hat';
+end
+
 % remove NaNs
 A = [y, y_hat];
 A(isnan(y),:) = [];

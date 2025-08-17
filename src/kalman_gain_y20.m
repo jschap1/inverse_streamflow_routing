@@ -8,15 +8,16 @@
 % Options for pseudoinverse if the system is ill-conditioned
 % Accounts for missing data
 % Assumes H, P, R are singles, but could be adapted for sparse matrices
+% H1 is H after accounting for missing values
 
-function K = kalman_gain_y20(H, P, R, missing_rows, w, varargin)
+function [K,H1] = kalman_gain_y20(H, P, R, missing_rows, w, varargin)
 
 if nargin>5
     sparseflag = varargin{1};
-    disp('Using sparse matrices for kalman gain')
+    %disp('Using sparse matrices for kalman gain')
 else
     sparseflag = 0;
-    disp('Using singles for kalman gain')
+    %disp('Using singles for kalman gain')
 end
 
 switch sparseflag
@@ -57,18 +58,35 @@ end
 % R = R(1:m,1:m);
 % missing_rows = missing_rows(1:m);
 
-disp(['Calculating Kalman gain for window ' num2str(w)])
+%disp(['Calculating Kalman gain for window ' num2str(w)])
 
 if sum(missing_rows) == 0
 %     disp(['Using pinv for window ' num2str(w)])
     K = (P*H')*pinv(H*P*H' + R);
-else
     H1 = H;
-    H1(missing_rows,:) = 0;
-    K = (P*H1')*pinv(H1*P*H1' + R);
+else
+    
+    % Ming Pan's method (requires removing missing rows from innov, too)
+    H1 = H;
+    H1(missing_rows,:) = [];
+    R(missing_rows,:) = [];
+    R(:,missing_rows) = [];
 %     K = (P*H1')/(H1*P*H1' + R);
-    K(isnan(K)) = 0;
+    K = (P*H1')*pinv(H1*P*H1' + R);
+%     K(isnan(K)) = 0;
+
+%     figure,imagesc(P), colorbar, title('Cyy Y20'), set(gca, 'fontsize', 18)
+%     figure,imagesc(P*H1'), colorbar, title('Cyz Y20'), set(gca, 'fontsize', 18)
+%     figure,imagesc(H1*P*H1'), colorbar, title('Czz Y20'), set(gca, 'fontsize', 18)
+%     kalm = P*H'/(H*P*H'+R);
+%      figure,imagesc(kalm), colorbar, title('kalm Y20'), set(gca, 'fontsize', 18)
+%      figure,imagesc(K), colorbar, title('K Y20')
+
 end
+
+% figure,imagesc(P*H'), colorbar, title('Cyz Y20'), set(gca, 'fontsize', 18)
+% figure,imagesc(H*P*H'), colorbar, title('Czz Y20'), set(gca, 'fontsize', 18)
+% figure,imagesc(K), colorbar, title('K Y20')
 
 % innovation = NaN(m,1);
 % x_update = K*innovation;

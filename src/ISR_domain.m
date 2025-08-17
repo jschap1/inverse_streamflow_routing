@@ -17,6 +17,7 @@
 function [runoff, w1, w2] = ISR_domain(runoff_prior, HH_sub, gage, s_sub, basin, Cv, opt)
 
 runoff_prior = permute(runoff_prior, [2,1,3]); % put in format (nt, n, M)
+small_number = 1e-4; % to avoid taking log of zero (in case there are zeros in the initial guess)
 
 checknan = sum(isnan(runoff_prior(:)));
 if checknan>0
@@ -146,21 +147,84 @@ while i2<=nt % until out of range
     y = flipud(gage(i1:i2, :));
     y = reshape(y', m_sub*(s_sub+1), 1);
     
-    % Find any missing observations (day without obs)
-    missing_rows = isnan(y);
-   
+    % Get discharge for this window, minus any upstream discharge 
+    % (the upstream discharge has already been updated)
+       
     % Generate the ensemble of discharge errors
     % Assume normally-distributed and iid for now
 %     mu_y = zeros(m*(s+1),1);
 %     sigma_y = Cv;
 %     y_errs = mvnrnd(mu_y, sigma_y, M)';
     
-    % Calculate predicted measurements and innovation
-    predicted_measurement = H_sub*x + L_sub*xtmk;
-%     innovation = y + y_errs - predicted_measurement;
+
+    % to pass H into ENKF (if desired)
+    [Htmp, Ltmp] = calc_augmented_model(HH_sub, s_sub+1);
     
-    % Pause and see what is going on in the ISR update
+    % Predicted measurement for all cells upstream of gauge
+    predicted_measurement = H_sub*x + L_sub*xtmk;
+    
+    % Predicted measurement for cells in subdomain
+    predicted_measurement_sub = Htmp*x_sub + Ltmp*xtmk_sub;
+    
+    % Adjust gauge observation by subtracting contribution (posterior) from cells in
+    % upstream subbasins
+    opt.subtract_us_runoff = 0;
+    if opt.subtract_us_runoff
+        tmp1 = ismember((1:n)', opt.ind_current_basin); % get cells that are in upstream basin only
+        tmp2 = repmat(tmp1, s+1, 1);
+        x_us = x;
+        x_us(tmp2,:) = 0;
+        xtmk_us = xtmk;
+        xtmk_us(tmp2,:) = 0;
+        ypred_ups = H_sub*x_us + L_sub*xtmk_us; % predicted meas using cells in upstream subdomains
+        y_sub = y - mean(ypred_ups,2);
+        if nanmin(y_sub)<0
+            warning('negative ysub')
+            warning('setting ysub<0 to NaN (skipping update)')
+            y_sub(y_sub<0) = NaN;
+            % using upstream cells is problematic bc postQ can be larger than
+            % trueQ, meaning upstream Q can be larger than downstream Q
+        end
+    end
             
+    missing_rows = isnan(y);
+    
+    % Adjust gauge observation by subtracting contribution (posterior) from gages in
+    % upstream subbasins
+    opt.yups=0;
+    if opt.yups
+        yups = zeros(size(y));
+        if min(missing_rows)==0
+            nupgages = length(opt.current_upstream_gages);
+            if nupgages>0 % if there are any upstream gauges
+                for gind=1:nupgages
+                    usgagei = opt.current_upstream_gages(gind);
+                    lag = opt.us_gages_lag(usgagei);
+                    yups1 = opt.gages(i1-lag:i2-lag,usgagei); % streamflow at upstream gauges
+                    yups1 = flipud(yups1);
+                    yups1 = reshape(yups1', m_sub*(s_sub+1), 1);
+                    yups = yups + yups1;
+    %                 y_sub = y - yups;
+                end
+            end
+        end
+        y_sub = y - yups;
+        if min(y_sub)<0
+            warning('negative ysub, setting to small number')
+            % could also set to NaN to skip
+            y_sub(y_sub<0) = small_number;
+        end
+    end
+    
+    % Use routing model, but assign discharge to cell
+    %ypred_ups = H_sub*x_us + L_sub*xtmk_us;
+    
+    % Find any missing observations (day without obs)
+    missing_rows = isnan(y);
+    if min(missing_rows)==0
+        1;
+    end
+    
     if opt.plot
         
         % Compare prior mean runoff to truth
@@ -177,9 +241,9 @@ while i2<=nt % until out of range
         
         % Compare predicted measurements to measurements (with errors)
         figure
-        plot(mean(predicted_measurement,2))
+        plot(mean(predicted_measurement,2), 'b-')
         hold on
-        plot(y)
+        plot(y,'r-*')
         legend('Pred. meas','Meas')
         
     end
@@ -221,22 +285,55 @@ while i2<=nt % until out of range
 %     figure
 %     bar(cumsum(flipud(diag(D)))./sum(D(:)))
     
-if w==32
-    1
+% something is happening to case nan runoff in window 218, subbasin 15
+if w==217
+    1;
 end
 
     % log
-    small_number = 1e-4; % to avoid taking log of zero (in case there are zeros in the initial guess)
-%     if all(missing_rows==1) % debugging
-%         1;
-%     elseif sum(missing_rows>0)
-%         1;
-%     elseif sum(missing_rows==0)
-%         1;
-%     end
-    tmp = ENKF(log(x_sub+small_number), log(predicted_measurement), log(y), Cv, missing_rows);
+%     small_number = 0;
+    if all(missing_rows==1) % debugging
+        1;
+    elseif sum(missing_rows>0)
+        1;
+    elseif sum(missing_rows==0)
+        1;
+    end
+        
+    if opt.gauss
+        % Assuming additive Gaussian error model
+        %x_update = ENKF(x, predicted_measurement, y, Cv, missing_rows, Htmp, opt.ind_current_basin);
+%         x_update = ENKF(x_sub, predicted_measurement, y, Cv, missing_rows, opt); % old version 
+        x_update = ENKF(x_sub, predicted_measurement, y, Cv, missing_rows, opt, Htmp);
+        %[Y_UPDATE]=ENKF(Y_ENS,Z_ENS,ZMEAS,Cv, missing_rows, opt, varargin) 
+        %x_update = ENKF(x_sub, predicted_measurement_sub, y_sub, Cv, missing_rows, Htmp); % new version
+    else
+        % Assuming multiplicative lognormal error model
+        small_number = 1e-4; % to avoid taking log of zero (in case there are zeros in the initial guess)
+        % tmp = ENKF(log(x_sub+small_number), log(predicted_measurement_sub), log(y_sub), Cv, missing_rows, Htmp);
+        tmp = ENKF(log(x_sub+small_number), log(predicted_measurement), log(y), Cv, missing_rows, Htmp);
+        x_update = exp(tmp) - small_number;
+        if min(x_update(:))<0
+            warning('negative runoff')
+            % x_update(x_update<0) = 0; % in case exp(tmp) = 0
+        end
+    end
+    
+    
 %     tmp = ENKF(log(x_sub), log(predicted_measurement), log(y), Cv, missing_rows);
-    x_update = exp(tmp) - small_number;
+
+    % Ensemble square root filter implementation
+    %
+    % 8/28/2023 JRS
+    % Eliminates the need to simulate observation errors/may improve the update as a result
+    
+    
+
+    
+%     x_update(x_update<0) = 0; % in case exp(tmp) = 0
+    
+%     postQ = state_model_dumb(x_update(end-71:end,:)', HH_sub);
+    
     
 %     max(abs(x_update(:) - x_sub(:)))
     
@@ -266,31 +363,31 @@ end
     runoff(i1:i2,opt.ind_current_basin,:) = x_update_matrix;
 %     aa = reshape(x_update, s+1, n, M);
 %     x_update_matrix = flipud(a);
-    
+%     ro = runoff(:,opt.ind_current_basin,:); 
+%     postypred = state_model_dumb(mean(ro,3), HH_sub);
+%     if min(postypred(:))<0
+%         1
+%     end
 if opt.plot
-    mxum = mean(x_update_matrix,3);
-    figure
-    subplot(1,2,1)
-    imagesc(mean(runoff(i1:i2,:,:),3)), colorbar, title('prior')
-    subplot(1,2,2)
-    imagesc(mxum), colorbar, title('update')
-end
-
-if opt.plot
-
+%%
     % mean posterior discharge
-    postypred = state_model_dumb(mean(runoff,3), HH);
+    ro = runoff(:,opt.ind_current_basin,:); 
+%     postypred = state_model_dumb(mean(runoff,3), HH);
+    postypred = state_model_dumb(mean(ro,3), HH_sub);
     
     % mean predicted measurement
-    ypred = mean(unfliparoom(predicted_measurement, m, s),3);
+    ypred = mean(unfliparoom(predicted_measurement_sub, m_sub, s_sub),3);
     
     figure
     gg=1; % gage number
-    plot(i1:i2, ypred(:,gg),'blue','linewidth',2)
+    plot(i1:i2, ypred(:,gg),'blue-*','linewidth',2)
     hold on
     plot(i1:i2, postypred(i1:i2,gg),'red','linewidth',2)
-    plot(i1:i2, gage(i1:i2, gg),'.k', 'markersize', 20)
+    plot(i1:i2, flipud(y_sub),'.k', 'markersize', 20)
+%     plot(i1:i2, gage(i1:i2, gg),'.k', 'markersize', 20)
     legend('prior','posterior','measurement')
+    xlim([10,50])
+    ylim([0,100])
     xlabel('timestep')
     ylabel('discharge (mmd)')
     
@@ -337,5 +434,22 @@ end
 end % end main loop
 
 runoff = permute(runoff, [2,1,3]);
+
+% Check if posterior discharge matches observed discharge
+% opt.ind_current_basin
+
+% prior.mean_runoff = mean(runoff_prior,3);
+% posterior.mean_runoff = mean(runoff,3);
+% 
+% prior.meanQ = state_model_dumb(prior.mean_runoff(:,opt.ind_current_basin), HH_sub);
+% posterior.meanQ = state_model_dumb(posterior.mean_runoff(opt.ind_current_basin,:)', HH_sub);
+% 
+% figure
+% plot(prior.meanQ, 'b', 'linewidth', 2)
+% hold on
+% plot(posterior.meanQ, 'r', 'linewidth', 2)
+% plot(gage, 'k.', 'markersize', 20)
+% legend('Prior Q','Post Q', 'Observations')
+
 
 return

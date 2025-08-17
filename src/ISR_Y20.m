@@ -11,13 +11,33 @@
 %
 % OUTPUTS
 % runoff = updated runoff estimate
+%
+% 11/12/2023 Attempted to add discharge error tracking (JRS)
+% (this feature doesn't work entirely. It produces a jagged pattern
+% that repeats every s-k timesteps. Most likely because we aren't
+% accounting for Lx_{t-k} cross-correlation terms in the var(y_t)
+% calculation. Can look into this in the future.
 
-function [runoff, K] = ISR_Y20(runoff_init, HH, gage, s, basin, optionsfile, varargin)
+function [runoff, post_stddev, prior_stddev, K] = ...
+    ISR_Y20(runoff_init, HH, gage, s, basin, optionsfile, varargin)
 
+cKF = 0; % flag for constrained KF
+pauseloc = 240; % i2 to pause at, if desired
+
+if length(unique(runoff_init(:))) == 1
+    % if runoff initial guess is uniform and constant, then K is
+    % time-invariant
+    uniform_prior = 1;
+else
+    uniform_prior = 0;
+end
 % basin.true_runoff = basin.true_runoff';
 
 % flag for using correlation or covariance
-usecorr = 0; 
+usecorr = 0;
+if usecorr
+    disp('Using correlation instead of covariance')
+end
  
 % read options
 opt = parse_options_file(optionsfile);
@@ -25,10 +45,11 @@ opt.quiet = 1;
 opt.endwindow = 1e5;
 
 if nargin>6
-    [L,T,rho_thres] = varargin{:};
+    [L,T,rho_thres, alpha] = varargin{:};
     opt.L = L;
     opt.T = T;
     opt.rho_thres = rho_thres;
+    opt.alpha = alpha;
 end
 
 % Compute key parameters
@@ -61,8 +82,18 @@ if ~opt.quiet
 end
 
 runoff = runoff_init;
+post_stddev = zeros(nt,n); % standard deviation of runoff estimates
+prior_stddev = zeros(nt,n); % standard deviation of runoff prior
 
-tic;
+% (for future incorporation)
+% post_stddevQ = zeros(nt,m); % standard deviation of posterior Q estimates
+% prior_stddevQ = zeros(nt,m); % standard deviation of prior Q estimates
+
+if opt.quiet
+    1;
+else
+    tic
+end
 
 % keep track of runoff errors
 % prior_re = zeros(s+1, n, nwin);
@@ -140,28 +171,36 @@ while i2<=nt % until out of range
         xtrue = reshape(xtrue', n*(s+1), 1);         
         x4cov = xtrue;
     else
+%         x4cov = ones(size(x)); % 
         x4cov = x;
     end   
     
     % Calculate runoff error covariance
+    if ~uniform_prior || ~exist('Cx')
     if ~always_same_K
+           
+        % can't use this if using domain localization bc domain size
+        % changes from subbasin to subbasin
         SC_TC_exist = exist(opt.SC_savename, 'file') > 0 && exist(opt.TC_savename, 'file') > 0;
-    if SC_TC_exist
-        % re-use TC, SC
-        
-        disp(['Calculating prior covariance for window ' num2str(w) ' of ' num2str(nwin)])
-        tic
-        Cx = calc_yang_covariance2(basin, opt, n, s, x4cov, opt.rho_savename);
-        toc
-        
-%         figure
-%         imagesc(Cx(1:5*n,1:5*n))
-%         colorbar
-        
-    else
-        % calculate TC, SC
-        Cx = calc_yang_covariance2(basin, opt, n, s, x4cov);
-    end       
+        if SC_TC_exist % & ~opt.use_domain_loc
+            % re-use TC, SC
+
+            %disp(['Calculating prior covariance for window ' num2str(w) ' of ' num2str(nwin)])
+            %tic
+            [Cx, rho_x] = calc_yang_covariance2(basin, opt, n, s, x4cov, opt.rho_savename);
+            %toc
+
+    %         figure
+    %         imagesc(Cx(1:5*n,1:5*n))
+    %         colorbar
+
+        else
+            % calculate TC, SC
+            [Cx, rho_x] = calc_yang_covariance2(basin, opt, n, s, x4cov);
+%             figure,imagesc(Cx), colorbar, title('Cyy Y20'), set(gca, 'fontsize', 18)
+        end       
+    end
+    
     end
     
     % Calculate runoff error correlation (if desired)
@@ -174,34 +213,60 @@ while i2<=nt % until out of range
     % Update runoff estimate
     predicted_measurement = H*x + L*xtmk;
     innovation = y - predicted_measurement;
-    R = sparse(m*(s+1), m*(s+1));
-    R(1:(m*(s+1)+1):numel(R)) = opt.sigma^2;
+    
+    % Construct discharge error covariance matrix
+    R = speye(m*(s+1));
+    diagR = (opt.sigma^2)*y.^2;
+    diagR(missing_rows) = 0; % missing rows could introduce NaNs into R
+    R(1:(m*(s+1)+1):end) = diagR;    
     R = single(full(R));
     
-%     R = zeros(m*(s+1), m*(s+1));
+  pauseloc = 171;
+  if i2>=pauseloc
+        1;
+  end
     
     % Calculate Kalman gain (using corrmat for exp. purp.)
     if ~always_same_K % in the case where initial runoff is uniform, K will always be the same
     if usecorr
         % use correlation only (ignore covariance)
-        K = kalman_gain_y20(H, corrmat, R, missing_rows, w);
-    else
-        % use covariance (scaling correlation by runoff initial guess)
-        tic
-        K = kalman_gain_y20(H, Cx, R, missing_rows, w); % 8 minutes for swot ohio...
-        toc
+        Cx = opt.alpha^2*rho_x;
     end
+        % use covariance (scaling correlation by runoff initial guess)
+%         tic
+        [K,H1] = kalman_gain_y20(H, Cx, R, missing_rows, w); % 8 minutes for swot ohio...
+%         toc
 %     figure, imagesc(corrmat), colorbar, title('\rho')
 %     figure, imagesc(K), colorbar, title('K')
     end
     
 %     save('./kalman_gain_L100_T0.mat','K','Cx', '-v7.3')
-    
+
+%save('~/Downloads/Y20_true.mat', 'Cx','H','R')    
+
     % need to get rid of NaN values in innovation to avoid NaNs in x_update
-    innovation(missing_rows) = 1; % K entries are zero for these rows, so no update
+    innovation(missing_rows) = []; % K entries are zero for these rows, so no update
     
     x_update = x + K*innovation;
-
+    Cx_update = (eye(n*(s+1)) - K*H1)*Cx;
+    v1 = diag(Cx_update); % posterior runoff variance
+    s1 = sqrt(v1); % posterior runoff stddev
+    
+%     (for future incorporation)
+%     posterior discharge variance
+%     ptdv = H*Cx_update*H'; 
+%     ptdv1 = diag(ptdv); 
+%     ptds1 = sqrt(ptdv1);
+% 
+%     prior discharge variance
+%     prdv = H*Cx*H';
+%     prds1 = sqrt(diag(prdv));
+    
+    % constrained KF (optional)
+    if cKF
+        x_update(x_update<0) = 0;
+    end
+    
 %     if w == 5
 %         make_ISR_plot(x, x_update, basin, s, i1, i2)
 %     end
@@ -209,9 +274,53 @@ while i2<=nt % until out of range
     % Calculate prior runoff error
 %     prior_re(:,:,w) = basin.true_runoff(i1:i2,:) - runoff(i1:i2, :);
     
-    % Put x back into the runoff array
+    % -----Put x back into the runoff array-----
+    
     x_update_matrix = flipud(reshape(x_update,n, s+1)');
+    stddev_update_matrix_post = flipud(reshape(s1, n, s+1)');
+    
+    v1 = diag(Cx); % prior variance
+    s1 = sqrt(v1); % prior stddev
+    stddev_update_matrix_prior = flipud(reshape(s1, n, s+1)');
+    
+    % (for future incorporation)
+%     stddev_update_matrix_postQ = flipud(reshape(ptds1, m, s+1)');
+%     stddev_update_matrix_priorQ = flipud(reshape(prds1, m, s+1)');
+    
     runoff(i1:i2, :) = x_update_matrix;
+    post_stddev(i1:i2, :) = stddev_update_matrix_post;
+    prior_stddev(i1:i2, :) = stddev_update_matrix_prior;
+    
+    % (for future incorporation)
+%     post_stddevQ(i1:i2, :) = stddev_update_matrix_postQ;
+%     prior_stddevQ(i1:i2, :) = stddev_update_matrix_priorQ;
+    
+    opt.plot=0;
+    if opt.plot
+    %%
+        % mean posterior discharge
+        postypred = state_model_dumb(runoff, HH);
+
+        % mean predicted measurement
+        ypred = unfliparoo(predicted_measurement, m, s);
+
+        figure
+        gg=1; % gage number
+        plot(i1:i2, ypred(:,gg),'blue-*','linewidth',2)
+        hold on
+        plot(i1:i2, postypred(i1:i2,gg),'red','linewidth',2)
+        plot(i1:i2, gage(i1:i2, gg),'.k', 'markersize', 20)
+        legend('prior','posterior','measurement')
+%         xlim([5,15])
+%         ylim([100,250])
+        xlabel('timestep')
+        ylabel('discharge (mmd)')
+
+        %%
+    end
+
+    
+    
     
 %     
 %     x_matrix = unfliparoo(x, n, s);

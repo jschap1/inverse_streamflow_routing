@@ -2,11 +2,16 @@
 %
 % Updated 10/11/2022 JRS to use memory efficiently
 % Option to supply rho_x so it doesn't have to be re-calculated
+%
+% INPUTS
+% x = runoff values. Runoff error standard deviation is assumed
+% proportional to these. Must be a vector of length [] ...
 
-function Cx = calc_yang_covariance2(basin, opt, n, s, x, varargin)
+function [Cx, rho_x] = calc_yang_covariance2(basin, opt, n, s, x, varargin)
 
 if nargin == 5
 
+    saveflag = 0; % determines if SC, TC, rho are saved for reuse
     % Calculate SC and TC
    
     % Use assumed values of L and T (to generate Cx for ISR)
@@ -18,7 +23,9 @@ if nargin == 5
 %     basin.distmat = aa.basin.distmat;
     
     SC = calc_SC(opt.k1, basin.distmat, opt.rho_thres, n, s, opt.RAM);
-    save(opt.SC_savename, 'SC', '-v7.3')
+    if saveflag 
+        save(opt.SC_savename, 'SC', '-v7.3')
+    end
     
 %     figure
 %     imagesc(SC(1:2*n,1:2*n))
@@ -26,7 +33,9 @@ if nargin == 5
         
 %     load('./covariance_matrices/TC_1.mat');
     TC = calc_TC(opt.k2, opt.rho_thres, n, s, opt.RAM);
-    save(opt.TC_savename, 'TC', '-v7.3')
+    if saveflag
+        save(opt.TC_savename, 'TC', '-v7.3')
+    end
     
 %     figure
 %     imagesc(TC(1:5*n,1:5*n))
@@ -35,12 +44,14 @@ if nargin == 5
     try
         rho_x = SC.*TC;
     catch
-        disp('Converting SC and TC to singles')
+%         disp('Converting SC and TC to singles')
         SC = single(full(SC)); % in case SC and TC have different data types
         TC = single(full(TC));
         rho_x = SC.*TC;
     end
-    save(opt.rho_savename, 'rho_x', '-v7.3')
+    if saveflag
+        save(opt.rho_savename, 'rho_x', '-v7.3')
+    end
     clearvars SC TC      
     
 %     figure
@@ -89,8 +100,8 @@ if S < opt.RAM
 
 else
 
-    disp('phi does not fit in memory')
-    disp(' we will need to calculate Cx without explicitly storing phi')
+%     disp('phi does not fit in memory')
+%     disp(' we will need to calculate Cx without explicitly storing phi')
 
     % Find indices of nonzero values in Cx
     [i,j] = find(rho_x~=0);
@@ -103,6 +114,8 @@ else
     Cx = sparse(i,j,nonzero_vals, n*(s+1), n*(s+1));
 
 end
+
+% figure, imagesc(Cx), colorbar
     
 return
 

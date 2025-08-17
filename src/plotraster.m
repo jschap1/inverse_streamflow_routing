@@ -16,6 +16,8 @@
 
 function im = plotraster(x, y, r, titletext, varargin)
 
+% r = flipud(r); % 7/21/2023
+
 numvarargs = length(varargin);
 if numvarargs > 5
     error('The max number of optional arguments is 5')

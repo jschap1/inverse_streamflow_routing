@@ -5,7 +5,7 @@ function RMSE = myRMSE(y, y_hat)
 % remove NaNs
 A = [y, y_hat];
 A(isnan(y),:) = [];
-A(isnan(y_hat),:) = [];
+% A(isnan(y_hat),:) = [];
 y = A(:,1);
 y_hat = A(:,2);
 

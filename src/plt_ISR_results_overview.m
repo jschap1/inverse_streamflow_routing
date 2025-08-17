@@ -1,4 +1,4 @@
-function plt_ISR_results_overview(basin, mean_prior_runoff, mean_posterior_runoff, truth, tv, varargin)
+function [kge, rmse, nse]= plt_ISR_results_overview(basin, mean_prior_runoff, mean_posterior_runoff, truth, tv, varargin)
 
 if nargin<6
     nt = length(tv);
@@ -9,21 +9,27 @@ end
 
 n = size(basin.true_runoff,1);
 
+% figure,plot(mean_posterior_runoff(7,:))
+% hold on, plot(truth.total_runoff(7,:))
+kge = struct();
+rmse = struct();
+nse = struct();
+
 figure
 subplot(1,3,1)
-[nse1, kge, rmse, nsemap] = plot_gofmaps(basin, mean_prior_runoff', truth.total_runoff, gi);
+[nse.prior, kge.prior, rmse.prior, nsemap] = plot_gofmaps(basin, mean_prior_runoff', truth.total_runoff, gi);
 hold on
 plot(basin.gage_lon, basin.gage_lat, 'r.')
 title('Prior mean (NSE)')
 % title('Prior mean (KGE)')
 subplot(1,3,2)
-[nse2, kge, rmse, nsemap] = plot_gofmaps(basin, mean_posterior_runoff', truth.total_runoff, gi);
+[nse.posterior, kge.posterior, rmse.posterior, nsemap] = plot_gofmaps(basin, mean_posterior_runoff', truth.total_runoff, gi);
 hold on
 plot(basin.gage_lon, basin.gage_lat, 'r.')
 % title('Posterior mean (KGE)')
 title('Posterior mean (NSE)')
 subplot(1,3,3)
-plotraster(basin.lonv, basin.latv, make_map(basin, nse2-nse1), 'sdf')
+plotraster(basin.lonv, basin.latv, make_map(basin, nse.posterior-nse.prior), 'sdf')
 hold on
 plot(basin.gage_lon, basin.gage_lat, 'r.')
 title('Improvement in NSE')

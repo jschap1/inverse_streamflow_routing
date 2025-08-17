@@ -71,15 +71,15 @@ caxis([0,1])
 
 % [~, maxi] = max(kge)
 
-disp(['mean NSE: ' num2str(nanmean(nse))])
+% disp(['mean NSE: ' num2str(nanmean(nse))])
 disp(['median NSE: ' num2str(nanmedian(nse))])
 
-disp(['min KGE: ' num2str(nanmin(kge))])
-disp(['max KGE: ' num2str(nanmax(kge))])
-disp(['mean KGE: ' num2str(nanmean(kge))])
-disp(['median KGE: ' num2str(nanmedian(kge))])
-
-disp(['mean RMSE: ' num2str(nanmean(rmse))])
-disp(['median RMSE: ' num2str(nanmedian(rmse))])
+% disp(['min KGE: ' num2str(nanmin(kge))])
+% disp(['max KGE: ' num2str(nanmax(kge))])
+% disp(['mean KGE: ' num2str(nanmean(kge))])
+% disp(['median KGE: ' num2str(nanmedian(kge))])
+% 
+% disp(['mean RMSE: ' num2str(nanmean(rmse))])
+% disp(['median RMSE: ' num2str(nanmedian(rmse))])
 
 return

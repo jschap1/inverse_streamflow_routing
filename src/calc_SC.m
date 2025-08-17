@@ -2,7 +2,7 @@
 
 function SCaug = calc_SC(k1, distmat, rho_thres, n, s, RAM)
 
-disp('Calculating spatial correlation matrix')
+% disp('Calculating spatial correlation matrix')
 
 % determine the proportion of nonzero elements in the SC matrix
 maxdist= -log(rho_thres)/k1;
@@ -19,11 +19,11 @@ percent_nonzero = nnz/n_entries;
 nnz = percent_nonzero*(n*(s+1))^2;
 D = max(nnz,1)*16+8*(n*(s+1)+1);
 D = D/1e9; % memory requirement (GB)
-disp(['Sparse matrix will require up to ' num2str(D) ' GB of memory'])
+% disp(['Sparse matrix will require up to ' num2str(D) ' GB of memory'])
 
 % memory required for the single matrix
 S = 4*((n*(s+1))^2)/1e9;
-disp(['Single-precision matrix will require ' num2str(S) ' GB of memory'])
+% disp(['Single-precision matrix will require ' num2str(S) ' GB of memory'])
 
 if D>=RAM && S>=RAM
     
@@ -32,7 +32,7 @@ if D>=RAM && S>=RAM
 elseif D <= S
     
     % use sparse
-    disp('Using sparse matrix for SC')
+%     disp('Using sparse matrix for SC')
         
     SC = exp(-k1*distmat);
     SC(SC<rho_thres) = 0;
@@ -123,8 +123,8 @@ elseif D <= S
 elseif S < D
     
     % use single
-    disp('There are many non-zero values in SC')
-    disp('Using single precision matrix for SC')
+%     disp('There are many non-zero values in SC')
+%     disp('Using single precision matrix for SC')
     
     SC = single(exp(-k1*distmat));
     SC(SC<rho_thres) = 0;

@@ -16,7 +16,7 @@ fclose(fid);
 
 opt = struct();
 for i=1:length(options{1})
-    disp(['Setting ' options{1}{i} '=' options{2}{i}])
+%     disp(['Setting ' options{1}{i} '=' options{2}{i}])
     eval(['opt.' options{1}{i} '=' options{2}{i} ';'])
 end
 

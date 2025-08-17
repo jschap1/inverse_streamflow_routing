@@ -10,7 +10,7 @@
 
 function K = kalman_gain_pw13(H, P, R, missing_rows, w)
 
-disp(['Calculating Kalman gain for window ' num2str(w)])
+% disp(['Calculating Kalman gain for window ' num2str(w)])
 
 if sum(missing_rows) == 0
 %     disp(['Using pinv for window ' num2str(w)])
@@ -27,11 +27,28 @@ if sum(missing_rows) == 0
     
 %     K = (P*H')*pinv(H*P*H' + R);
 else
+    
+    % my original method
+%     H1 = H;
+%     H1(missing_rows,:) = 0;
+%     K = (P*H1')/(H1*P*H1' + R);
+%     K(isnan(K)) = 0;
+    
+    % Ming Pan's method (requires removing missing rows from innov, too)
     H1 = H;
-    H1(missing_rows,:) = 0;
-%     K = (P*H1')*pinv(H1*P*H1' + R);
+    H1(missing_rows,:) = [];
+    R(missing_rows,:) = [];
+    R(:,missing_rows) = [];
     K = (P*H1')/(H1*P*H1' + R);
-    K(isnan(K)) = 0;
+    % This method is better because it makes the matrix smaller and avoids
+    % having rank deficient matrices
+    
+    %     K = (P*H1')*pinv(full(H1*P*H1' + R)); % pseudo-inverse
+    
 end
+
+% figure, imagesc(K), title('K'),colorbar
+% figure, imagesc(K2), title('K with missing rows'), colorbar
+% figure, imagesc(K3), title('K with pinv'), colorbar
 
 return

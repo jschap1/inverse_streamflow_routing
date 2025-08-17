@@ -26,7 +26,7 @@ else
     basinflag = 0;
 end
 
-opt.timer = 0; tic
+opt.timer = 1; tic
 opt.progress = 1;
 opt.plotP = 0;
 
@@ -43,7 +43,7 @@ nwin = floor((nt-(k+1)*2)/((s+1)-(k+1))) + 1;
 
 % Handle the steps that aren't fully updated at the end of the ISR
 % i_last = nwin*(s+1) - (nwin-1)*(k+1);
-disp(['Last ' num2str(k+1) ' steps will not be fully updated'])
+% disp(['Last ' num2str(k+1) ' steps will not be fully updated'])
 
 runoff = runoff_init;
 
@@ -52,12 +52,23 @@ H = sparse(H);
 L = sparse(L);
 % R = sparse(R);
 
+no_missing_data = 1; % flag for the no_missing_data case (daily obs)
+disp('Check no_missing_data flag')
 proportional = 0;
+constK = 0;
 switch P_option
     case 'const_diag'
         % Under this assumption, K does not change from window to window
         P = alpha1^2*speye(n*(s+1));
-        K = H'/(H*H');
+        if meas_err == 0
+            constK = 1;
+            % K is only truly constant if there is no measurement error
+            if no_missing_data == 1
+                K = H'/(H*H');
+            end
+            % Also, if there are missing rows, K will have to be
+            % recalculated
+        end   
     case 'proportional'
         P = alpha1^2*speye(n*(s+1));
         proportional = 1;
@@ -137,21 +148,36 @@ while i2<=nt % until out of range
 %     plot(predicted_measurement)
 %     legend('true','pred')
 
-    % Construct measurement error matrix (relative error)
-    R = eye(m*(s+1));
-    R(1:(m*(s+1)+1):end) = y.^2;
-    R = (meas_err)*R;
-    R = sparse(R);
+    % Construct measurement error matrix
+    R = speye(m*(s+1));
+%     diagR = ones(m*(s+1),1)*meas_err^2;
+    diagR = meas_err*y.^2;
+    diagR(missing_rows) = 0; % missing rows could introduce NaNs into R
+    R(1:(m*(s+1)+1):end) = diagR;
     
-    if strcmp(P_option, 'proportional')
+    if strcmp(P_option, 'proportional') || (strcmp(P_option, 'const_diag') && ~constK || sum(missing_rows)>0)
         K = kalman_gain_pw13(H, P, R, missing_rows, w);
+%         figure,imagesc(P(1:n,1:n)),colorbar, title('P')
+%         figure,imagesc(R(1:m,1:m)),colorbar, title('R')
+%         figure,imagesc(K(1:n,1:m)),colorbar, title('K')
         % otherwise K could be time-invariant
+    end
+    
+    % Alternative Kalman gain formulation (still working on this one)
+%     for i=1:n(s+1)
+%         for j=1:m(s+1)
+%             K(i,j) = x(i)/sum(x(k)^2);
+%         end
+%     end
+    
+    if sum(missing_rows)>0
+        innovation(missing_rows) = [];
     end
     x_update = x + K*innovation; % by having K as sparse, it means 0*nan = 0
 %     P_update = (eye(n*(s+1)) - K*H)*P;
 
-    if any(isnan(x_update))
-        1
+    if any(x_update<0) % any(isnan(x_update))
+        sign(mean(innovation));
     end
     
     if opt.plotP
@@ -174,7 +200,7 @@ while i2<=nt % until out of range
     i2 = i1 + s; % ensure k+1 overlapping steps
     
     % Displays time to go
-%     disp(['Processed window ' num2str(w) ' of ' num2str(nwin)])
+    disp(['Processed window ' num2str(w) ' of ' num2str(nwin)])
     if opt.timer == 1
         time_for_iteration = toc;
         opt.timer = 0;

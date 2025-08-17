@@ -59,5 +59,10 @@ codegen/
 octave-workspace
 
 # Large files for Ohio basin example
-ohio_data/*
-hh_data/*
+/data/ohio_data/*
+/data/hh_data/*
+/data/allegheny_data/*
+/ohio_data/*
+/allegheny_data/*
+/hh_data/*
+
